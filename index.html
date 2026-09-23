@@ -1,0 +1,2000 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>熱血教師：搶救學業大作戰</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap');
+        body { font-family: 'Noto Sans TC', sans-serif; background-color: #f1f5f9; overflow: hidden; user-select: none; }
+        .card-hover:hover { transform: translateY(-10px) scale(1.02); box-shadow: 0 15px 30px -5px rgba(0, 0, 0, 0.3); z-index: 50; }
+        .shake { animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both; }
+        @keyframes shake {
+            10%, 90% { transform: translate3d(-1px, 0, 0); }
+            20%, 80% { transform: translate3d(2px, 0, 0); }
+            30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
+            40%, 60% { transform: translate3d(4px, 0, 0); }
+        }
+        @keyframes flip {
+            0% { transform: scale(1) rotateY(0deg); }
+            50% { transform: scale(1.1) rotateY(90deg); }
+            100% { transform: scale(1) rotateY(0deg); }
+        }
+        .student-active { border-color: #4f46e5; box-shadow: 0 0 20px rgba(79, 70, 229, 0.5); transform: scale(1.01); }
+        .modal-bg { backdrop-filter: blur(5px); }
+        .stat-bar { transition: width 0.3s ease; }
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        
+        /* 題目選項的樣式 */
+        .q-option { transition: all 0.2s ease; }
+        .q-option.selected { border-color: #4f46e5; background-color: #e0e7ff; color: #3730a3; font-weight: bold; }
+
+        /* 排行榜樣式 */
+        .rank-row:nth-child(1) .rank-num { background: linear-gradient(135deg, #FFD700, #FDB931); color: #8B6508; font-weight: 900; }
+        .rank-row:nth-child(2) .rank-num { background: linear-gradient(135deg, #E0E0E0, #BDBDBD); color: #424242; font-weight: 900; }
+        .rank-row:nth-child(3) .rank-num { background: linear-gradient(135deg, #CD7F32, #A0522D); color: #5C3A21; font-weight: 900; }
+    </style>
+</head>
+<body class="h-[100dvh] w-screen flex flex-col text-slate-800">
+
+    <!-- 載入與設定畫面 -->
+    <div id="loading-screen" class="fixed inset-0 bg-indigo-100 z-[200] flex flex-col items-center justify-center transition-opacity duration-500">
+        <div class="text-6xl mb-4 drop-shadow-md">🏫</div>
+        <h1 class="text-4xl font-black text-indigo-900 mb-8 drop-shadow-sm text-center">熱血教師：搶救學業大作戰</h1>
+        <div class="bg-white p-8 rounded-3xl shadow-2xl max-w-lg w-full text-center border-4 border-indigo-200 relative">
+            <button onclick="openLeaderboard()" class="absolute -top-5 -right-5 bg-yellow-400 hover:bg-yellow-500 text-slate-900 font-black py-2 px-4 rounded-full shadow-lg border-2 border-yellow-500 flex items-center gap-2 transition active:scale-95 z-10">
+                <span>🏆</span> 排行榜
+            </button>
+            <div id="grade-container">
+                <div class="mb-8 border-b-2 border-slate-100 pb-6">
+                    <button onclick="startTutorial()" class="w-full bg-yellow-400 hover:bg-yellow-500 text-slate-900 font-black py-3 px-6 rounded-xl transition shadow-lg active:scale-95 text-lg border-2 border-yellow-500 flex items-center justify-center gap-2">
+                        <span class="text-2xl">📖</span> 新手指引 (模擬教學模式)
+                    </button>
+                    <p class="text-xs text-slate-500 mt-2 font-bold">第一次遊玩？點擊此處讓電腦帶你快速上手！</p>
+                </div>
+
+                <p class="text-slate-600 font-bold mb-6 text-lg">請選擇要載入的題庫年級開始正式遊戲：</p>
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-3" id="grade-buttons"></div>
+            </div>
+
+            <div id="chapter-container" class="hidden flex-col items-center w-full">
+                <p class="text-slate-600 font-bold mb-4 text-lg">請選擇要進行的章節 (可複選)：</p>
+                <div id="chapter-buttons" class="grid grid-cols-1 gap-2 w-full max-h-[40vh] overflow-y-auto mb-6 p-2 border-2 border-indigo-50 rounded-xl custom-scrollbar"></div>
+                <button id="confirm-chapter-btn" onclick="confirmChaptersAndStart()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-black py-3 px-6 rounded-xl transition shadow-lg active:scale-95 text-lg disabled:opacity-50 disabled:cursor-not-allowed border-2 border-indigo-400" disabled>確認並開始遊戲</button>
+            </div>
+
+            <div id="loading-text" class="hidden mt-6 text-indigo-600 font-bold animate-pulse text-lg flex items-center justify-center gap-2">
+                <svg class="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                正在從 Google Sheets 載入題庫...
+            </div>
+            <div id="loading-error" class="hidden mt-6 text-red-600 font-bold text-sm bg-red-50 p-4 rounded-xl border-2 border-red-200 whitespace-pre-line"></div>
+        </div>
+    </div>
+
+    <!-- 頂部資訊列 -->
+    <header class="bg-indigo-900 text-white p-2 flex justify-between items-center shadow-md z-10 shrink-0">
+        <div class="font-bold text-lg flex items-center gap-2">
+            <span>📅 回合 <span id="turn-display" class="text-yellow-300 text-xl">1</span> <span class="text-indigo-300 text-xs">/ 無盡</span></span>
+            <span class="text-xs bg-indigo-700 px-2 py-1 rounded-lg ml-2 border border-indigo-500 shadow-inner" id="phase-display">階段 1：指導學生</span>
+        </div>
+        <div class="flex items-center gap-3 text-xs font-bold">
+            <div class="flex items-center gap-1 bg-indigo-800 px-2 py-1 rounded-full border border-indigo-600"><span class="text-sm">🗂️</span> 牌庫: <span id="deck-count">0</span></div>
+            <div class="flex items-center gap-1 bg-indigo-800 px-2 py-1 rounded-full border border-indigo-600"><span class="text-sm">🗑️</span> 垃圾場: <span id="grave-count">0</span></div>
+            <div class="flex items-center gap-1 bg-indigo-800 px-2 py-1 rounded-full border border-indigo-600"><span class="text-sm">✋</span> 上限: <span id="hand-limit-display">5</span></div>
+            <div class="flex items-center gap-1 bg-indigo-800 px-2 py-1 rounded-full border border-indigo-600"><span class="text-sm">🎓</span> 存活: <span id="alive-count">12/12</span></div>
+        </div>
+    </header>
+
+    <!-- 主遊戲區 -->
+    <main class="flex-1 flex overflow-hidden bg-slate-50 relative">
+        <!-- 中央指導區 -->
+        <div class="flex-1 flex flex-col items-center justify-start pt-6 pb-2 relative z-0 overflow-y-auto custom-scrollbar">
+            <!-- 當前指導學生 -->
+            <div id="active-student-area" class="w-full max-w-4xl px-4 flex flex-col items-center relative transition-all duration-300"></div>
+            
+            <!-- 操作按鈕區 -->
+            <div id="action-area" class="mt-2 flex flex-col items-center gap-2 hidden pb-4">
+                <button id="end-student-btn" onclick="endCurrentStudent()" class="bg-emerald-600 hover:bg-emerald-500 text-white font-black py-2 px-8 rounded-full shadow-lg transition active:scale-95 text-lg border-4 border-emerald-400 flex items-center gap-2">
+                    <span class="text-xl">⏩</span> 結束指導此學生
+                </button>
+                <p class="text-[10px] sm:text-xs font-bold text-slate-500 bg-slate-200 px-3 py-1 rounded-full">※ 隨時可點擊，保留剩餘手牌與次數</p>
+            </div>
+        </div>
+
+        <!-- 右側等候列 -->
+        <div class="w-64 md:w-72 bg-white border-l-2 border-slate-200 shadow-[-5px_0_15px_rgba(0,0,0,0.05)] flex flex-col shrink-0 z-10">
+            <div class="bg-indigo-100 p-2 text-center font-bold text-indigo-900 border-b-2 border-indigo-200 shadow-sm flex justify-between items-center px-3 text-sm">
+                <span>名單列</span>
+                <span class="text-[10px] bg-indigo-600 text-white px-2 py-0.5 rounded-md">僅存活學生</span>
+            </div>
+            <div id="student-queue" class="flex-1 overflow-y-auto p-2 flex flex-col gap-2 bg-slate-50 custom-scrollbar"></div>
+        </div>
+
+        <!-- 浮動提示區 -->
+        <div id="toast-container" class="absolute top-16 left-1/2 transform -translate-x-1/2 flex flex-col gap-2 pointer-events-none z-50"></div>
+    </main>
+
+    <!-- 底部手牌區 -->
+    <footer class="h-28 md:h-32 lg:h-36 bg-slate-800 border-t-4 border-indigo-500 relative flex flex-col justify-end items-center pb-4 shrink-0 z-20 shadow-[0_-10px_20px_rgba(0,0,0,0.15)]">
+        <div class="absolute -top-4 bg-indigo-500 text-white px-4 py-1 rounded-full font-bold text-xs shadow-md border-2 border-slate-800 tracking-widest">您的手牌</div>
+        
+        <button onclick="showGlossaryModal()" class="absolute top-3 right-4 bg-indigo-600/90 hover:bg-indigo-500 text-white px-4 py-2 rounded-xl font-bold text-xs shadow-md border-2 border-indigo-400 z-40 flex items-center gap-1 transition active:scale-95">
+            <span class="text-base">ℹ️</span> 狀態與機制解說
+        </button>
+
+        <div id="hand-container" class="flex justify-center gap-[-10px] w-full max-w-5xl px-4 perspective-[1000px]"></div>
+        <div id="hand-overlay" class="absolute inset-0 bg-slate-900/70 hidden items-center justify-center text-white font-bold text-lg backdrop-blur-sm transition-all duration-300 z-30">
+            目前無法出牌
+        </div>
+    </footer>
+
+    <!-- 雙題目視窗 -->
+    <div id="question-modal" class="fixed inset-0 bg-slate-900/90 modal-bg z-[100] hidden flex-col items-center p-4 overflow-y-auto">
+        <div id="question-box" class="bg-white p-6 rounded-3xl shadow-2xl max-w-2xl w-full border-4 border-indigo-500 flex flex-col my-auto shrink-0 transition-transform">
+            <div class="flex justify-between items-center mb-4 border-b-2 border-slate-100 pb-3">
+                <div><span id="q-chapter" class="bg-indigo-100 text-indigo-800 px-3 py-1 rounded-lg text-xs font-bold shadow-sm"></span></div>
+                <span class="bg-red-100 text-red-800 px-3 py-1 rounded-lg text-xs font-bold animate-pulse border border-red-300">📝 雙題隨堂測驗</span>
+            </div>
+            <div class="flex flex-col gap-4 mb-6">
+                <!-- 題目 1 & 2 容器將由 JS 填入 -->
+                <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 shadow-sm">
+                    <h3 class="font-bold text-indigo-700 mb-2 flex items-center gap-2 text-sm"><span class="bg-indigo-200 text-indigo-900 w-5 h-5 rounded-full flex items-center justify-center text-[10px]">1</span> 第一題</h3>
+                    <h2 id="q1-text" class="text-lg font-black text-slate-800 mb-3 leading-relaxed"></h2>
+                    <div id="q1-options" class="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm"></div>
+                </div>
+                <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 shadow-sm">
+                    <h3 class="font-bold text-indigo-700 mb-2 flex items-center gap-2 text-sm"><span class="bg-indigo-200 text-indigo-900 w-5 h-5 rounded-full flex items-center justify-center text-[10px]">2</span> 第二題</h3>
+                    <h2 id="q2-text" class="text-lg font-black text-slate-800 mb-3 leading-relaxed"></h2>
+                    <div id="q2-options" class="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm"></div>
+                </div>
+            </div>
+            <button id="submit-answers-btn" onclick="submitAnswers()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-black py-3 px-6 rounded-xl transition shadow-lg active:scale-95 text-lg disabled:opacity-50 disabled:cursor-not-allowed border-2 border-indigo-400" disabled>確認送出答案</button>
+        </div>
+    </div>
+
+    <!-- 狀態與能力解說視窗 -->
+    <div id="glossary-modal" class="fixed inset-0 bg-slate-900/90 modal-bg z-[500] hidden flex-col items-center justify-center p-4">
+        <div class="bg-white p-6 rounded-3xl shadow-2xl max-w-xl w-full border-4 border-indigo-400 relative flex flex-col max-h-[90vh]">
+            <button onclick="closeGlossaryModal()" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600 text-3xl font-black transition">&times;</button>
+            <h2 class="text-2xl font-black text-slate-800 mb-4 flex items-center gap-2 border-b-2 border-slate-100 pb-3"><span>ℹ️</span> 狀態與機制解說</h2>
+            <div class="space-y-4 text-sm font-bold text-slate-600 overflow-y-auto custom-scrollbar pr-2 flex-1">
+                <div class="bg-red-50 p-4 rounded-xl border border-red-200">
+                    <h3 class="text-red-600 text-lg mb-2 flex items-center gap-2"><span>💤</span> 偷懶</h3>
+                    <ul class="list-disc pl-5 space-y-1">
+                        <li>指導該學生時，可打出的卡牌數量減少 1 張 (剩餘 2 張)。</li>
+                        <li>在「階段 2：學生能力發揮」時，該學生無法被選中。</li>
+                    </ul>
+                </div>
+                <div class="bg-orange-50 p-4 rounded-xl border border-orange-200">
+                    <h3 class="text-orange-600 text-lg mb-2 flex items-center gap-2"><span>💢</span> 過勞</h3>
+                    <ul class="list-disc pl-5 space-y-1">
+                        <li>每次指導該學生結束時，<span class="text-red-500 font-bold">每 1 層過勞將使其流失 5 點體力。</span></li>
+                        <li>達到 5 層時，學生會「過勞倒下」：體力立即下降 20 點並陷入偷懶，隨後層數歸零。</li>
+                    </ul>
+                </div>
+                <div class="bg-emerald-50 p-4 rounded-xl border border-emerald-200">
+                    <h3 class="text-emerald-600 text-lg mb-2 flex items-center gap-2"><span>💯</span> 滿分獎勵</h3>
+                    <ul class="list-disc pl-5 space-y-1">
+                        <li>學習力或體力達到 100 滿分時，會立即獲得一張強力的「滿分獎勵卡」。</li>
+                    </ul>
+                </div>
+                <div class="bg-indigo-50 p-4 rounded-xl border border-indigo-200">
+                    <h3 class="text-indigo-600 text-lg mb-2 flex items-center gap-2"><span>🎓</span> 退場與失敗</h3>
+                    <ul class="list-disc pl-5 space-y-1">
+                        <li><span class="text-red-500">學習力歸 0</span>：逃學退場。 <span class="text-orange-500">體力歸 0</span>：生病退場。</li>
+                        <li>學生退場會獲得「退場懲罰卡」。<span class="text-red-600 font-black">累計 3 名學生退場，遊戲失敗！</span></li>
+                    </ul>
+                </div>
+            </div>
+            <button onclick="closeGlossaryModal()" class="mt-4 w-full bg-indigo-600 hover:bg-indigo-700 text-white font-black py-3 rounded-xl transition shadow-lg active:scale-95 text-lg border-2 border-indigo-400">我知道了</button>
+        </div>
+    </div>
+
+    <!-- 排行榜視窗 -->
+    <div id="leaderboard-modal" class="fixed inset-0 bg-slate-900/95 modal-bg z-[600] hidden flex-col items-center justify-center p-4 overflow-y-auto">
+        <div class="bg-white p-6 rounded-3xl shadow-2xl max-w-3xl w-full border-4 border-yellow-400 relative flex flex-col max-h-[90vh]">
+            <button onclick="closeLeaderboard()" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600 text-3xl font-black transition">&times;</button>
+            <h2 class="text-3xl font-black text-slate-800 mb-4 flex items-center gap-2 border-b-2 border-slate-100 pb-3 justify-center">
+                <span>🏆</span> 榮譽榜
+            </h2>
+            
+            <div class="flex justify-between items-center mb-4">
+                <div class="flex gap-2" id="lb-grade-tabs">
+                    <!-- Grade tabs generated by JS -->
+                </div>
+                <div class="flex gap-2">
+                    <button id="tab-score" onclick="switchLbTab('score')" class="bg-indigo-600 text-white px-4 py-2 rounded-lg font-bold text-sm shadow-sm transition border-2 border-indigo-600">最高平均分</button>
+                    <button id="tab-turns" onclick="switchLbTab('turns')" class="bg-slate-200 text-slate-600 hover:bg-slate-300 px-4 py-2 rounded-lg font-bold text-sm shadow-sm transition border-2 border-transparent">最高生存回合</button>
+                </div>
+            </div>
+
+            <div class="bg-slate-50 rounded-xl border border-slate-200 flex-1 overflow-hidden flex flex-col relative">
+                <!-- Loading overlay -->
+                <div id="lb-loading" class="absolute inset-0 bg-white/80 z-10 flex items-center justify-center hidden">
+                    <div class="text-indigo-600 font-bold animate-pulse flex flex-col items-center">
+                        <svg class="animate-spin h-8 w-8 mb-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                        載入資料中...
+                    </div>
+                </div>
+
+                <div class="flex bg-slate-200 p-2 font-bold text-slate-600 text-sm">
+                    <div class="w-16 text-center">排名</div>
+                    <div class="flex-1">玩家名稱</div>
+                    <div class="w-24 text-center">平均分數</div>
+                    <div class="w-24 text-center">生存回合</div>
+                </div>
+                <div id="lb-list" class="flex-1 overflow-y-auto custom-scrollbar p-2 space-y-1">
+                    <!-- JS Injected List -->
+                </div>
+            </div>
+
+            <!-- Admin Area Toggle -->
+            <div class="mt-4 border-t-2 border-slate-100 pt-4 flex flex-col items-end">
+                <button onclick="toggleAdminPanel()" class="text-slate-400 hover:text-slate-600 text-sm font-bold flex items-center gap-1 transition">
+                    <span>⚙️</span> 管理員選項
+                </button>
+                <div id="admin-panel" class="hidden mt-2 flex items-center gap-2 bg-slate-100 p-2 rounded-xl border border-slate-200">
+                    <input type="password" id="admin-pwd" placeholder="密碼(gmes)" class="px-3 py-1.5 rounded-lg border border-slate-300 text-sm outline-none focus:border-indigo-400">
+                    <button onclick="adminAction('grade')" class="bg-red-500 hover:bg-red-600 text-white px-3 py-1.5 rounded-lg text-sm font-bold shadow-sm transition">清除此題庫</button>
+                    <button onclick="adminAction('all')" class="bg-red-700 hover:bg-red-800 text-white px-3 py-1.5 rounded-lg text-sm font-bold shadow-sm transition">清除所有題庫</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 選擇視窗 -->
+    <div id="selection-modal" class="fixed inset-0 bg-slate-900/95 modal-bg z-[110] hidden flex-col items-center p-4 overflow-y-auto">
+        <div class="my-auto w-full flex flex-col items-center shrink-0">
+            <h2 id="selection-title" class="text-3xl font-black text-white mb-2 drop-shadow-lg text-center">請選擇卡牌</h2>
+            <p id="selection-desc" class="text-indigo-200 mb-6 font-bold text-sm text-center bg-slate-800/50 px-6 py-2 rounded-full border border-slate-700"></p>
+            <div id="selection-grid" class="flex flex-wrap justify-center gap-4 max-w-5xl"></div>
+            <div class="mt-8 flex gap-4">
+                <button id="selection-confirm-btn" class="bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-3 px-10 rounded-xl shadow-xl transition active:scale-95 text-lg disabled:opacity-50 border-2 border-indigo-400 hidden">確認選擇</button>
+                <button id="selection-skip-btn" class="bg-slate-600 hover:bg-slate-500 text-white font-bold py-3 px-10 rounded-xl shadow-xl transition active:scale-95 text-lg border-2 border-slate-400 hidden">跳過</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 突發狀況視窗 -->
+    <div id="event-modal" class="fixed inset-0 bg-slate-900/95 modal-bg z-[110] hidden flex-col items-center justify-center p-4">
+        <h2 class="text-3xl font-black text-white mb-2 drop-shadow-lg text-center">校園突發狀況</h2>
+        <p id="event-desc" class="text-red-300 mb-8 font-bold text-sm text-center bg-slate-800/50 px-6 py-2 rounded-full border border-slate-700">請抽取命運卡片決定發生的事件</p>
+        <div id="event-grid" class="flex flex-wrap justify-center gap-6 max-w-4xl"></div>
+    </div>
+
+    <!-- 無盡模式繼續確認視窗 -->
+    <div id="continue-modal" class="fixed inset-0 bg-slate-900/95 modal-bg z-[150] hidden flex-col items-center justify-center p-4">
+        <div class="bg-white p-8 rounded-3xl shadow-2xl max-w-md w-full text-center border-4 border-indigo-500">
+            <div class="text-6xl mb-4">⏳</div>
+            <h2 class="text-3xl font-black text-slate-800 mb-4">第 <span id="continue-turn"></span> 回合結束</h2>
+            <p class="text-slate-600 font-bold mb-8">要繼續無盡挑戰，還是見好就收進行結算？</p>
+            <div class="flex gap-4 justify-center">
+                <button onclick="resumeEndless()" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-black py-3 rounded-xl shadow-lg active:scale-95 text-lg border-2 border-indigo-400">繼續指導</button>
+                <button onclick="endGame()" class="flex-1 bg-red-500 hover:bg-red-600 text-white font-black py-3 rounded-xl shadow-lg active:scale-95 text-lg border-2 border-red-400">結束並結算</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 結算視窗 -->
+    <div id="game-over-modal" class="fixed inset-0 bg-slate-900/95 modal-bg z-[200] hidden flex-col items-center p-4 overflow-y-auto">
+        <div class="my-auto w-full max-w-2xl flex flex-col items-center shrink-0">
+            <div class="text-7xl mb-4 animate-bounce">🎓</div>
+            <h1 id="game-over-title" class="text-5xl font-black text-white mb-3 drop-shadow-xl">學期結束！</h1>
+            <p id="game-over-desc" class="text-xl text-indigo-200 mb-6 font-bold"></p>
+            <div class="bg-white p-8 rounded-3xl w-full text-center shadow-2xl border-4 border-indigo-500">
+                <h2 class="text-2xl font-bold text-slate-800 mb-2">全班考試平均成績 (學習力)</h2>
+                <p class="text-xs text-slate-500 mb-4 font-bold">* 逃走與生病未考的學生以 0 分計算 *</p>
+                <div id="final-score" class="text-7xl font-black text-indigo-600 mb-6 drop-shadow-md"></div>
+                
+                <div class="grid grid-cols-3 gap-3 mb-6 bg-slate-50 p-4 rounded-2xl border border-slate-200">
+                    <div class="flex flex-col items-center">
+                        <span class="text-3xl mb-1">🏆</span>
+                        <span class="font-bold text-slate-700 text-sm">順利結業</span>
+                        <span id="final-alive" class="text-xl font-black text-emerald-600"></span>
+                    </div>
+                    <div class="flex flex-col items-center border-x-2 border-slate-200">
+                        <span class="text-3xl mb-1">🏃</span>
+                        <span class="font-bold text-slate-700 text-sm">放棄逃走</span>
+                        <span id="final-escaped" class="text-xl font-black text-red-500"></span>
+                    </div>
+                    <div class="flex flex-col items-center">
+                        <span class="text-3xl mb-1">🤒</span>
+                        <span class="font-bold text-slate-700 text-sm">過度操勞</span>
+                        <span id="final-sick" class="text-xl font-black text-orange-500"></span>
+                    </div>
+                </div>
+
+                <div id="submit-score-section" class="mb-6 bg-yellow-50 p-4 rounded-2xl border-2 border-yellow-300 flex flex-col gap-3 hidden">
+                    <h3 class="font-black text-yellow-700 text-lg">登錄榮譽榜</h3>
+                    <input type="text" id="player-name-input" placeholder="請輸入您的大名..." class="text-center w-full px-4 py-3 rounded-xl border-2 border-yellow-400 focus:border-indigo-500 outline-none font-bold text-slate-700">
+                    <button onclick="submitLeaderboard()" class="w-full bg-yellow-500 hover:bg-yellow-400 text-slate-900 font-black py-3 rounded-xl shadow-lg active:scale-95 transition border-2 border-yellow-600">送出成績</button>
+                </div>
+
+                <button onclick="location.reload()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-black py-3 px-8 rounded-xl transition shadow-xl active:scale-95 text-lg border-2 border-indigo-400 w-full">回到主畫面 / 重新開始</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 教學視窗 -->
+    <div id="tutorial-ui" class="fixed bottom-8 left-1/2 transform -translate-x-1/2 bg-slate-900/95 text-white p-6 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] z-[400] w-11/12 max-w-2xl hidden border-4 border-yellow-400 flex-col pointer-events-auto">
+        <h3 class="text-yellow-400 font-black text-2xl mb-3 flex items-center gap-2"><span>💡</span> 新手指引 (模擬教學)</h3>
+        <p id="tutorial-text" class="text-lg mb-6 leading-relaxed font-bold whitespace-pre-line"></p>
+        <div class="flex justify-end">
+            <button id="tutorial-next-btn" onclick="advanceTutorial()" class="bg-yellow-500 hover:bg-yellow-400 text-slate-900 font-black py-3 px-8 rounded-xl shadow-lg transition active:scale-95 text-lg border-2 border-yellow-300">下一步</button>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, addDoc, deleteDoc, collection, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // 替換為您的 Firebase 配置
+        const firebaseConfig = {
+            apiKey: "AIzaSyCfc_3kRlbDFnlLPe0_IUEoHKIHrA8D0DI",
+            authDomain: "teacher-saving-game.firebaseapp.com",
+            projectId: "teacher-saving-game",
+            storageBucket: "teacher-saving-game.firebasestorage.app",
+            messagingSenderId: "457575275181",
+            appId: "1:457575275181:web:b7a8fc85ba814b72ba8424"
+        };
+        
+        let app, db, auth;
+        let currentUser = null;
+        let isFirebaseReady = false;
+
+        try {
+            app = initializeApp(firebaseConfig);
+            db = getFirestore(app);
+            auth = getAuth(app);
+        } catch(e) {
+            console.error("Firebase init failed:", e);
+        }
+
+        async function initAuth() {
+            if(!auth) return;
+            try {
+                // 強制使用匿名登入，忽略所有平台注入的金鑰
+                await signInAnonymously(auth);
+                currentUser = auth.currentUser;
+                isFirebaseReady = true;
+                console.log("Firebase Auth Ready");
+            } catch (error) {
+                console.error("Auth error:", error);
+            }
+        }
+        initAuth();
+
+        // Game state variables
+        let isTutorial = false;
+        let isComputerPlaying = false;
+        let tutorialStep = 0;
+        let questions = [];
+        let allParsedQuestions = []; 
+        let selectedChapters = new Set();
+        let currentSelectionResolve = null;
+        let currentSelectionCancelOverride = null;
+        let currentSelectedItems = [];
+        let currentSelectionMax = 1;
+        let q1Data = null, q2Data = null;
+        let selectedAns1 = null, selectedAns2 = null;
+
+        let gameState = {
+            turn: 1, phase: 1, students: [], activeQueue: [], currentStudent: null,
+            deck: [], hand: [], grave: [], handLimit: 5, cardUid: 0,
+            draftPicksLeft: 0, recycleMax: 0, recycleUsed: 0,
+            pendingCard: null, pendingCardS: null,
+            eventsDrawnThisTurn: 0, extraDraftOptions: 0,
+            bonusHandLimit: 0, permanentHandLimitBonus: 0,
+            isGameOver: false,
+            currentGrade: '3上' // Track current grade for leaderboard
+        };
+
+        let lbAllScores = [];
+        let currentLbGrade = '3上';
+        let currentLbTab = 'score'; // 'score' or 'turns'
+
+        const GRADE_URLS = {
+            '3上': 'https://docs.google.com/spreadsheets/d/1s3H5EQLidgq1IHrwWqzuOLlziCBIGJisXBilyGlN_2M/export?format=csv&gid=995589110',
+            '3下': 'https://docs.google.com/spreadsheets/d/1s3H5EQLidgq1IHrwWqzuOLlziCBIGJisXBilyGlN_2M/export?format=csv&gid=1369174473',
+            '4上': 'https://docs.google.com/spreadsheets/d/1s3H5EQLidgq1IHrwWqzuOLlziCBIGJisXBilyGlN_2M/export?format=csv&gid=1313580076',
+            '4下': 'https://docs.google.com/spreadsheets/d/1s3H5EQLidgq1IHrwWqzuOLlziCBIGJisXBilyGlN_2M/export?format=csv&gid=810565624',
+            '5上': 'https://docs.google.com/spreadsheets/d/1s3H5EQLidgq1IHrwWqzuOLlziCBIGJisXBilyGlN_2M/export?format=csv&gid=1245946937',
+            '5下': 'https://docs.google.com/spreadsheets/d/1s3H5EQLidgq1IHrwWqzuOLlziCBIGJisXBilyGlN_2M/export?format=csv&gid=2054239014',
+            '6上': 'https://docs.google.com/spreadsheets/d/1s3H5EQLidgq1IHrwWqzuOLlziCBIGJisXBilyGlN_2M/export?format=csv&gid=776073742',
+            '6下': 'https://docs.google.com/spreadsheets/d/1s3H5EQLidgq1IHrwWqzuOLlziCBIGJisXBilyGlN_2M/export?format=csv&gid=126972207',
+        };
+
+        const BASE_DECK = [
+            { name: "基礎講義", icon: "https://drive.google.com/file/d/1URW4TP9Dp9fSx7B-Z_XCPNnfVEW2-wAt/view?usp=sharing", effects: [{ stat: 's', val: 10 }] },
+            { name: "進階講義", icon: "https://drive.google.com/file/d/1PY3Kg0RuIHOgFEL7QPB5ACR6Uah7dqWH/view?usp=sharing", effects: [{ stat: 's', val: 15 }] },
+            { name: "熬夜苦讀", icon: "https://drive.google.com/file/d/1yHsXrKEYVEJXUf1p6xbqQjwHMAbGd_YN/view?usp=sharing", effects: [{ stat: 'h', val: -10 }, { stat: 's', val: 15 }] },
+            { name: "基礎體能", icon: "https://drive.google.com/file/d/1RqdEDoewNIcCC2RyoBitPmAIufYE2HHL/view?usp=sharing", effects: [{ stat: 'h', val: 10 }] },
+            { name: "進階體能", icon: "https://drive.google.com/file/d/1qLPlI__3ZVJ5bNbxJ-zQBiskU87qMNdr/view?usp=sharing", effects: [{ stat: 'h', val: 15 }] },
+            { name: "逃課運動", icon: "https://drive.google.com/file/d/1h0Qvnr5Gf8xH1M7ED6illY28cSin2Mg8/view?usp=sharing", effects: [{ stat: 's', val: -10 }, { stat: 'h', val: 15 }] },
+            { name: "嚴厲斥責", icon: "https://drive.google.com/file/d/1e-F8d4ujrTJ-dklnBWJtsxCsoTPHtxNw/view?usp=sharing", effects: [{ stat: 'lazy', val: -1 }, { stat: 'h', val: -10 }] },
+            { name: "溫泉舒壓", icon: "https://drive.google.com/file/d/1HYwWe__1Bj8n0oz4fneihfw7yzs15pBG/view?usp=sharing", effects: [{ stat: 'ow', val: -1 }, { stat: 's', val: -5 }, { stat: 'h', val: 15 }] }
+        ];
+
+        const CARD_POOL = [
+            { name: "魔鬼特訓", icon: "https://drive.google.com/file/d/1Wmv_DTRCltyXUdnwUM-joeDyfsT_BLUa/view?usp=sharing", effects: [{ stat: 's', val: 25 }, { stat: 'h', val: -20 }, { stat: 'ow', val: -1 }] },
+            { name: "放空冥想", icon: "https://drive.google.com/file/d/1LvsEu405-QxCduQjBBrMOOLgx_V7Qalq/view?usp=sharing", effects: [{ stat: 'h', val: 35 }, { stat: 's', val: -15 }] },
+            { name: "摸魚達人", icon: "https://drive.google.com/file/d/1OKx_1fv6YVTXTOyieb2BPSeYjmEeyWfH/view?usp=sharing", effects: [{ stat: 's', val: 25 }, { stat: 'lazy', val: 1 }] },
+            { name: "瘋狂自學", icon: "https://drive.google.com/file/d/1njiGW7gZFFN5KtsIjXg-XTgR-ZrQtyVf/view?usp=sharing", effects: [{ stat: 'h', val: 35 }, { stat: 's', val: -10 }, { stat: 'ow', val: 2 }, { type: 'auto_study' }] },
+            { name: "靈光乍現", icon: "https://drive.google.com/file/d/1wiBoIKi4zdJw_wC3RRpAGP4sXqj9oc1c/view?usp=sharing", effects: [{ stat: 'lazy', val: -1 }, { stat: 's', val: 20 }, { stat: 'ow', val: 2 }, { type: 'auto_study' }] },
+            { name: "稍微喘息", icon: "https://drive.google.com/file/d/1bXqYCTyDEwuujykcPP4lMS7oH3Qe8iF5/view?usp=sharing", effects: [{ stat: 'h', val: 15 }, { stat: 'ow', val: -1 }] },
+            { name: "提神飲料", icon: "https://drive.google.com/file/d/1oY2m9va7cOKlwjAO8ImzCYeJxdnPtrX3/view?usp=sharing", effects: [{ stat: 'lazy', val: -1 }, { stat: 's', val: 5 }] },
+            { name: "狀態絕佳(體)", icon: "https://drive.google.com/file/d/1WWRBEDkRpr7ULjmMfFac5U9QJPKCY8E0/view?usp=sharing", effects: [{ type: 'condition_no_lazy', stat: 'h', val: 25 }] },
+            { name: "狀態絕佳(勞)", icon: "https://drive.google.com/file/d/1GnMYRvmH11f-9JLVN8KPlEYB6jxz4jFZ/view?usp=sharing", effects: [{ type: 'condition_no_lazy', stat: 'ow', val: -2 }] },
+            { name: "狀態絕佳(學)", icon: "https://drive.google.com/file/d/150wQvr0vAcfNHqAprpPyuDy7Lh_RrGUD/view?usp=sharing", effects: [{ type: 'condition_no_lazy', stat: 's', val: 25 }] },
+            { name: "體力補充包", icon: "https://drive.google.com/file/d/1CmEIjCNzEFjl4H7Uky_dck5Cnp2unrpC/view?usp=sharing", effects: [{ stat: 'h', val: 10 }, { type: 'draw', val: 3 }] },
+            { name: "知識斷捨離", icon: "https://drive.google.com/file/d/1hQQqLZnmiug2X2PaTpH0q9GMKK7crBEJ/view?usp=sharing", effects: [{ stat: 's', val: 15 }, { type: 'discard', val: 2 }] },
+            { name: "去蕪存菁", icon: "https://drive.google.com/file/d/1TGOxdVt0J61ENoBn6y5Be_MbsYlqHh84/view?usp=sharing", effects: [{ type: 'draw', val: 2 }, { type: 'discard', val: 1 }] },
+            { name: "高效學習", icon: "https://drive.google.com/file/d/196ufQW32pj6t_dvjSD3PBZcwnNHopIkY/view?usp=sharing", effects: [{ stat: 'h', val: 10 }, { stat: 's', val: 15 }, { stat: 'ow', val: -1 }] },
+            { name: "破釜沉舟", icon: "https://drive.google.com/file/d/10qGDGUCVFirY2rFt-IshcvwcOk7pmDgI/view?usp=sharing", effects: [{ type: 'discard_all_for_stat', stat: 's', val: 10 }] },
+            { name: "徹底放飛", icon: "https://drive.google.com/file/d/1feAQPFA7AFz4ALcMCMnti7XyvKxf-5CJ/view?usp=sharing", effects: [{ type: 'discard_all' }, { stat: 'h', val: 40 }] },
+            { name: "重拾動力", icon: "https://drive.google.com/file/d/1zmbjZM8bErs8cGbsQ1kAlwEk4alVy8pD/view?usp=sharing", effects: [{ stat: 'lazy', val: -1 }, { type: 'draw', val: 2 }] },
+            { name: "深度放鬆", icon: "https://drive.google.com/file/d/1BfVaffBC-G56rcV2bnNXgby0AYx0mmYB/view?usp=sharing", effects: [{ stat: 'h', val: 30 }, { stat: 'ow', val: -2 }] },
+            { name: "光環：活力", icon: "https://drive.google.com/file/d/1J7tUuao3kMSfM7yyJf61F2DO53E5YkSS/view?usp=sharing", effects: [{ type: 'aura_h', val: 5 }] },
+            { name: "廢物利用(學)", icon: "https://drive.google.com/file/d/1OPimoocqT2WU9zpWfzXmmCRptHzZnqP8/view?usp=sharing", effects: [{ type: 'grave_scale', stat: 's', val: 4 }] },
+            { name: "廢物利用(體)", icon: "https://drive.google.com/file/d/1H7Ip3_tg__9LdP-yodyMLxu36Ibdy6Ey/view?usp=sharing", effects: [{ type: 'grave_scale', stat: 'h', val: 4 }] },
+            { name: "偷讀書", icon: "https://drive.google.com/file/d/1uMkMFEy-9V8wr4dAESYysFiFVZdNo-gz/view?usp=sharing", effects: [{ stat: 'lazy', val: -1 }, { type: 'free_play' }, { type: 'shuffle_back' }] },
+            { name: "檢索資料", icon: "https://drive.google.com/file/d/1bGJdsnfpcCdiLbBB-LW9Hto79xqxE0yj/view?usp=sharing", effects: [{ stat: 'h', val: 10 }, { type: 'search', val: 1 }] },
+            { name: "極限體能", icon: "https://drive.google.com/file/d/1b-kcSbWfI6gxqFpehE4cmGCSnH9IXiF3/view?usp=sharing", effects: [{ stat: 'h', val: 20 }, { stat: 'lazy', val: -1 }, { type: 'exhaust' }] },
+            { name: "活絡筋骨", icon: "https://drive.google.com/file/d/1K8bJRPlFnTbD_QitKrDFxzxgbE8fDG8K/view?usp=sharing", effects: [{ stat: 'h', val: 20 }, { stat: 'ow', val: -2 }, { type: 'exhaust' }] },
+            { name: "頓悟", icon: "https://drive.google.com/file/d/1wbnQa7T9WKQizZnukHXobaatQL7Wqw3A/view?usp=sharing", effects: [{ stat: 's', val: 25 }, { stat: 'lazy', val: -1 }, { type: 'exhaust' }] },
+            { name: "融會貫通", icon: "https://drive.google.com/file/d/1nSCj1WQVXZjvy9W9TSUXCKvPzMetVtgO/view?usp=sharing", effects: [{ stat: 's', val: 20 }, { stat: 'ow', val: -2 }, { type: 'exhaust' }] },
+            { name: "脫胎換骨", icon: "https://drive.google.com/file/d/1BAvucbHjVt-bCaFTasvxtFacajZN-V-o/view?usp=sharing", effects: [{ stat: 's', val: 20 }, { stat: 'h', val: 20 }, { type: 'exhaust' }] },
+            { name: "穩紮穩打", icon: "https://drive.google.com/file/d/1Bygek1im38jQBNQOSiV9rW3EA2s9AVwn/view?usp=sharing", effects: [{ stat: 's', val: 10 }, { stat: 'h', val: 10 }, { type: 'draw', val: 1 }, { type: 'shuffle_back' }] },
+            { name: "偷懶連帶", icon: "https://drive.google.com/file/d/1vqufCfIQFciC7-l735Uz3Ng14kLXUBXB/view?usp=sharing", effects: [{ stat: 'lazy', val: 1 }, { type: 'add_queue', val: 1 }] },
+            { name: "手牌優勢(學)", icon: "https://drive.google.com/file/d/1A3YfYcKQEO9EO89hSyuzRR8ZCumGonhF/view?usp=sharing", effects: [{ type: 'hand_scale', stat: 's', val: 5 }] },
+            { name: "手牌優勢(體)", icon: "https://drive.google.com/file/d/1qR2QizQF05SG0xljIds06Z1eQVXRVr-M/view?usp=sharing", effects: [{ type: 'hand_scale', stat: 'h', val: 5 }] },
+            { name: "靈感爆發", icon: "https://drive.google.com/file/d/1N-N8aQOAqlMPG_LaoKPPL7Vslhpu0pG_/view?usp=sharing", effects: [{ type: 'draw', val: 5 }] },
+            { name: "底蘊深厚(學)", icon: "https://drive.google.com/file/d/1IkfYD4T1dycqu_KHWQ9UYTJLebQDdtI_/view?usp=sharing", effects: [{ type: 'deck_scale', stat: 's', val: 3 }] },
+            { name: "底蘊深厚(體)", icon: "https://drive.google.com/file/d/15ApIbIrSZ_XCcG-q63z6hYXikrVIL9Pb/view?usp=sharing", effects: [{ type: 'deck_scale', stat: 'h', val: 3 }] },
+            { name: "千錘百鍊(學)", icon: "https://drive.google.com/file/d/1CkwXR2ly4eJIJ8M0vJu7d7K4UMfUEISl/view?usp=sharing", effects: [{ stat: 's', val: 5 }, { type: 'grow_on_discard', stat: 's', val: 5 }] },
+            { name: "千錘百鍊(體)", icon: "https://drive.google.com/file/d/14nxutD1WQYooh__SpUZDfmkvtOlfengt/view?usp=sharing", effects: [{ stat: 'h', val: 5 }, { type: 'grow_on_discard', stat: 'h', val: 5 }] },
+            { name: "傳染惰性", icon: "https://drive.google.com/file/d/16NXsYL0XTogOZHt5Ds1_tEGKttTNdDIE/view?usp=sharing", effects: [{ stat: 'lazy', val: 1 }, { type: 'share', stat: 'lazy', val: -1, count: 2 }] },
+            { name: "殺雞儆猴", icon: "https://drive.google.com/file/d/1CmjLZqBIX1jARfy98BjQK13oagTUkBYq/view?usp=sharing", effects: [{ stat: 's', val: -30 }, { type: 'share', stat: 's', val: 15, count: 'all' }] },
+            { name: "極限施壓", icon: "https://drive.google.com/file/d/1AtzC51QYaCf8MSjl_IFGEFhq3QnMtEZc/view?usp=sharing", effects: [{ stat: 'h', val: -30 }, { type: 'share', stat: 'h', val: 15, count: 'all' }] },
+            { name: "轉移壓力", icon: "https://drive.google.com/file/d/1kXShlY5q3mZ5KaJDbFFE70SpyeY-KlB8/view?usp=sharing", effects: [{ stat: 'ow', val: 1 }, { type: 'share', stat: 'ow', val: -1, count: 2 }] },
+            { name: "專注完美(學)", icon: "https://drive.google.com/file/d/12IbA6PLVrO6IubvrLr7jfGt1ch_vWM6a/view?usp=sharing", effects: [{ type: 'condition_no_ow', stat: 's', val: 20 }] },
+            { name: "專注完美(體)", icon: "https://drive.google.com/file/d/1FRNZYKnTSm1ZhKGu5t3yB9oNMRo5h2DK/view?usp=sharing", effects: [{ type: 'condition_no_ow', stat: 'h', val: 20 }] },
+            { name: "身心健康", icon: "https://drive.google.com/file/d/1LIhzlUOttcZW9UomzMaVygwZ0m0CvMuX/view?usp=sharing", effects: [{ type: 'condition_no_ow', stat: 'h', val: 5 }, { type: 'condition_no_ow', stat: 's', val: 5 }, { type: 'condition_no_ow', stat: 'lazy', val: -1 }] },
+            { name: "光環：智慧", icon: "https://drive.google.com/file/d/13PcM5cdZgU8rqY30gYF5zRzh94Scy3Nq/view?usp=sharing", effects: [{ type: 'aura_s', val: 5 }] }
+        ];
+
+        const UPGRADE_POOL = [
+            { stat: 's', val: 10, text: '學習 +10' }, { stat: 'h', val: 10, text: '體力 +10' },
+            { type: 'condition_no_lazy', stat: 's', val: 15, text: '無偷懶時學習 +15' }, { type: 'condition_no_lazy', stat: 'h', val: 15, text: '無偷懶時體力 +15' },
+            { stat: 'lazy', val: -1, text: '解除偷懶' }, { stat: 'ow', val: -1, text: '解除 1 層過勞' },
+            { type: 'draw', val: 1, text: '抽 1 張牌' }, { type: 'discard', val: 1, text: '可拋棄最多 1 張牌' },
+            { type: 'condition_no_ow', stat: 's', val: 15, text: '無過勞時學習 +15' }, { type: 'condition_no_ow', stat: 'h', val: 15, text: '無過勞時體力 +15' }
+        ];
+
+        const PENALTY_CARDS = [
+            { name: "逃避心理", icon: "https://drive.google.com/file/d/152S-M-DQQF6U9_ksGJwM1p1h6L6SGCDz/view?usp=sharing", effects: [{ stat: 's', val: -20 }, { stat: 'lazy', val: 1 }, { type: 'aura_end_s', val: -5 }, { type: 'exhaust' }] },
+            { name: "身心俱疲", icon: "https://drive.google.com/file/d/1XCVE7eYSocIKPLD166Oa95FDw5e7VIRv/view?usp=sharing", effects: [{ stat: 'h', val: -25 }, { stat: 'lazy', val: 1 }, { type: 'aura_end_h', val: -5 }, { type: 'exhaust' }] },
+            { name: "沉重壓力", icon: "https://drive.google.com/file/d/1WRDMownnp7g2ky4epQOb7vEaBiSAiC5Q/view?usp=sharing", effects: [{ stat: 'ow', val: 1 }, { stat: 'lazy', val: 1 }, { type: 'aura_end_ow', val: 1 }, { type: 'exhaust' }] }
+        ];
+
+        const STUDENT_NAMES = ["小明", "小華", "小美", "小強", "小智", "小霞", "小黑", "小白", "小傑", "小櫻", "小寶", "小宇"];
+        const STUDENT_IMAGES = ["👦", "👦🏻", "👧", "🧑", "🧑🏻", "👩", "👨", "👨🏻", "👱‍♂️", "👱‍♀️", "👶", "👦🏽"];
+
+        const NEGATIVE_EVENTS = [
+            { title: "流感肆虐", icon: "https://drive.google.com/file/d/1DGfv0lRd_MSTwM04uvQobU0aJeJ1N3xu/view?usp=sharing", desc: "隨機 1~3 名學生體力大幅下降！", fn: () => applyRandomStudentsEvent(1, 3, s => s.h -= 25) },
+            { title: "停電事故", icon: "https://drive.google.com/file/d/1UPC-mkkhbVwj6S-z-jGTAtQlBdcDquZ5/view?usp=sharing", desc: "隨機 2 名學生增加 1 層過勞！", fn: () => applyRandomStudentsEvent(2, 2, s => s.overwork += 1) },
+            { title: "沉迷遊戲", icon: "https://drive.google.com/file/d/1az0ebfv7PwX0xsOQIvKUm0FDbvcKxodz/view?usp=sharing", desc: "隨機 1~2 名學生陷入偷懶狀態！", fn: () => applyRandomStudentsEvent(1, 2, s => s.isLazy = true) },
+            { title: "期中考打擊", icon: "https://drive.google.com/file/d/154_VWcO9MFRcS7hMlNs1dplKc80cyyJG/view?usp=sharing", desc: "全班學習力 -10！", fn: () => applyAllAliveStudentsEvent(s => s.s -= 10) },
+            { title: "食物中毒", icon: "https://drive.google.com/file/d/1mCEQ1E042xefOjSmQzKayObNngItlZr-/view?usp=sharing", desc: "隨機 2 名學生體力 -20 且陷入偷懶！", fn: () => applyRandomStudentsEvent(2, 2, s => { s.h -= 20; s.isLazy = true; }) },
+            { title: "冷氣壞掉", icon: "https://drive.google.com/file/d/1Tomxp5g1mUXS-R4APCVIEA-OMDYoh_It/view?usp=sharing", desc: "全班過勞 +1。", fn: () => applyAllAliveStudentsEvent(s => s.overwork += 1) },
+            { title: "網路斷線", icon: "https://drive.google.com/file/d/1IeVmYKot7h1IZIiSBtdzdVxHARq0boJo/view?usp=sharing", desc: "隨機 2 名學生學習力 -15。", fn: () => applyRandomStudentsEvent(2, 2, s => s.s -= 15) },
+            { title: "忘記帶書", icon: "https://drive.google.com/file/d/1fNDWJFoF79B9YevCDs922-QpQ0PEcGzQ/view?usp=sharing", desc: "隨機 1 名學生學習力 -30。", fn: () => applyRandomStudentsEvent(1, 1, s => s.s -= 30) },
+            { title: "體育課太操", icon: "https://drive.google.com/file/d/1JDNbfqXmzqvizE6E2cGnk4B8qqVW5gqn/view?usp=sharing", desc: "全班體力 -15。", fn: () => applyAllAliveStudentsEvent(s => s.h -= 15) },
+            { title: "隔壁班太吵", icon: "https://drive.google.com/file/d/1bmS8axRltFj-Ghl2tvbY8WtleFQNb0wP/view?usp=sharing", desc: "隨機 2 名學生陷入偷懶，過勞 +1。", fn: () => applyRandomStudentsEvent(2, 2, s => { s.isLazy = true; s.overwork += 1; }) },
+            { title: "校車誤點", icon: "https://drive.google.com/file/d/16YnSaBwQ3qgFbDDHsgAn5IN7bL_AmKlq/view?usp=sharing", desc: "隨機 1 名學生體力 -20，學習力 -10。", fn: () => applyRandomStudentsEvent(1, 1, s => { s.h -= 20; s.s -= 10; }) },
+            { title: "無事發生", icon: "https://drive.google.com/file/d/1ktX5lmQuM1uK0RTKldvbTfrJfnIwCg1M/view?usp=sharing", desc: "大家都在認真上課。", fn: () => {} }
+        ];
+
+        window.startTutorial = startTutorial;
+        window.confirmChaptersAndStart = confirmChaptersAndStart;
+        window.endCurrentStudent = endCurrentStudent;
+        window.closeGlossaryModal = closeGlossaryModal;
+        window.showGlossaryModal = showGlossaryModal;
+        window.resumeEndless = resumeEndless;
+        window.endGame = endGame;
+        window.advanceTutorial = advanceTutorial;
+        window.useRecycleAbility = useRecycleAbility;
+        window.submitAnswers = submitAnswers;
+        window.openLeaderboard = openLeaderboard;
+        window.closeLeaderboard = closeLeaderboard;
+        window.switchLbTab = switchLbTab;
+        window.toggleAdminPanel = toggleAdminPanel;
+        window.adminAction = adminAction;
+        window.submitLeaderboard = submitLeaderboard;
+
+        // Drive image helper
+        function getSafeImageUrl(url) {
+            if (!url) return '';
+            const match = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
+            if (match && match[1]) {
+                return `https://lh3.googleusercontent.com/d/${match[1]}`;
+            }
+            return url;
+        }
+
+        // Setup Main menu
+        const container = document.getElementById('grade-buttons');
+        for (let g in GRADE_URLS) {
+            let btn = document.createElement('button');
+            btn.className = "bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border-2 border-indigo-200 font-bold py-2 px-4 rounded-xl transition active:scale-95 shadow-sm text-sm";
+            btn.innerText = g;
+            btn.onclick = () => loadQuestions(g);
+            container.appendChild(btn);
+        }
+
+        async function loadLeaderboardData() {
+            if (!isFirebaseReady) return;
+            document.getElementById('lb-loading').classList.remove('hidden');
+            try {
+                // 修改為直接儲存到 leaderboard 集合中
+                const colRef = collection(db, 'leaderboard');
+                const snapshot = await getDocs(colRef);
+                lbAllScores = [];
+                snapshot.forEach(doc => {
+                    lbAllScores.push({ id: doc.id, ...doc.data() });
+                });
+                renderLeaderboard();
+            } catch(e) {
+                console.error("Leaderboard fetch failed:", e);
+                showToast("排行榜載入失敗", "error");
+            }
+            document.getElementById('lb-loading').classList.add('hidden');
+        }
+
+        function openLeaderboard() {
+            document.getElementById('leaderboard-modal').classList.remove('hidden');
+            document.getElementById('leaderboard-modal').classList.add('flex');
+            
+            // Build Grade Tabs
+            const tabContainer = document.getElementById('lb-grade-tabs');
+            tabContainer.innerHTML = '';
+            Object.keys(GRADE_URLS).forEach(g => {
+                let b = document.createElement('button');
+                b.className = `px-3 py-1.5 rounded-lg font-bold text-sm transition ${currentLbGrade === g ? 'bg-yellow-400 text-slate-800 shadow border-2 border-yellow-500' : 'bg-slate-100 text-slate-500 hover:bg-slate-200 border-2 border-transparent'}`;
+                b.innerText = g;
+                b.onclick = () => {
+                    currentLbGrade = g;
+                    openLeaderboard(); // Re-render tabs and list
+                };
+                tabContainer.appendChild(b);
+            });
+
+            loadLeaderboardData();
+        }
+
+        function closeLeaderboard() {
+            document.getElementById('leaderboard-modal').classList.add('hidden');
+            document.getElementById('leaderboard-modal').classList.remove('flex');
+            document.getElementById('admin-panel').classList.add('hidden');
+        }
+
+        function switchLbTab(tab) {
+            currentLbTab = tab;
+            if (tab === 'score') {
+                document.getElementById('tab-score').className = "bg-indigo-600 text-white px-4 py-2 rounded-lg font-bold text-sm shadow-sm transition border-2 border-indigo-600";
+                document.getElementById('tab-turns').className = "bg-slate-200 text-slate-600 hover:bg-slate-300 px-4 py-2 rounded-lg font-bold text-sm shadow-sm transition border-2 border-transparent";
+            } else {
+                document.getElementById('tab-turns').className = "bg-indigo-600 text-white px-4 py-2 rounded-lg font-bold text-sm shadow-sm transition border-2 border-indigo-600";
+                document.getElementById('tab-score').className = "bg-slate-200 text-slate-600 hover:bg-slate-300 px-4 py-2 rounded-lg font-bold text-sm shadow-sm transition border-2 border-transparent";
+            }
+            renderLeaderboard();
+        }
+
+        function renderLeaderboard() {
+            const list = document.getElementById('lb-list');
+            list.innerHTML = '';
+
+            let filtered = lbAllScores.filter(s => s.grade === currentLbGrade);
+            
+            filtered.sort((a, b) => {
+                if (b[currentLbTab] !== a[currentLbTab]) {
+                    return b[currentLbTab] - a[currentLbTab]; // Descending
+                }
+                return a.timestamp - b.timestamp; // Earlier first if tie
+            });
+
+            let top10 = filtered.slice(0, 10);
+
+            if (top10.length === 0) {
+                list.innerHTML = '<div class="text-center text-slate-400 py-4 font-bold text-sm">此題庫目前無紀錄</div>';
+                return;
+            }
+
+            top10.forEach((record, index) => {
+                list.innerHTML += `
+                    <div class="flex items-center bg-white p-2 rounded-xl border border-slate-100 shadow-sm rank-row hover:bg-indigo-50 transition">
+                        <div class="w-16 flex justify-center">
+                            <span class="w-8 h-8 flex items-center justify-center rounded-full bg-slate-100 text-slate-500 font-black rank-num">${index + 1}</span>
+                        </div>
+                        <div class="flex-1 font-bold text-slate-700 truncate px-2">${record.name}</div>
+                        <div class="w-24 text-center font-black ${currentLbTab === 'score' ? 'text-indigo-600 text-lg' : 'text-slate-500'}">${record.score}</div>
+                        <div class="w-24 text-center font-black ${currentLbTab === 'turns' ? 'text-indigo-600 text-lg' : 'text-slate-500'}">${record.turns}</div>
+                    </div>
+                `;
+            });
+        }
+
+        function toggleAdminPanel() {
+            const panel = document.getElementById('admin-panel');
+            if(panel.classList.contains('hidden')) {
+                panel.classList.remove('hidden');
+            } else {
+                panel.classList.add('hidden');
+            }
+        }
+
+        async function adminAction(type) {
+            const pwd = document.getElementById('admin-pwd').value;
+            if (pwd !== 'gmes') {
+                showToast("管理員密碼錯誤", "error");
+                return;
+            }
+            if (!isFirebaseReady) return;
+
+            document.getElementById('lb-loading').classList.remove('hidden');
+            try {
+                // 修改路徑
+                const colRef = collection(db, 'leaderboard');
+                const snapshot = await getDocs(colRef);
+                let count = 0;
+                
+                for(let docSnap of snapshot.docs) {
+                    let d = docSnap.data();
+                    if (type === 'all' || (type === 'grade' && d.grade === currentLbGrade)) {
+                        await deleteDoc(doc(db, 'leaderboard', docSnap.id));
+                        count++;
+                    }
+                }
+                showToast(`已成功刪除 ${count} 筆資料`, "success");
+                loadLeaderboardData(); // refresh
+            } catch(e) {
+                console.error(e);
+                showToast("管理操作失敗", "error");
+                document.getElementById('lb-loading').classList.add('hidden');
+            }
+        }
+
+        async function submitLeaderboard() {
+            if (isTutorial) { showToast("教學模式不記錄成績！", "info"); return; }
+            if (!isFirebaseReady) { showToast("未連線，無法上傳！", "error"); return; }
+            
+            const name = document.getElementById('player-name-input').value.trim();
+            if(!name) { showToast("請輸入大名！", "error"); return; }
+
+            let totalS = 0;
+            gameState.students.forEach(s => {
+                if(!s.isDead) totalS += s.s;
+            });
+            let avg = Math.round(totalS / gameState.students.length);
+
+            const data = {
+                grade: gameState.currentGrade,
+                name: name,
+                score: avg,
+                turns: gameState.turn,
+                timestamp: Date.now()
+            };
+
+            try {
+                // 修改路徑
+                const colRef = collection(db, 'leaderboard');
+                await addDoc(colRef, data);
+                showToast("成績登錄成功！", "success");
+                document.getElementById('submit-score-section').classList.add('hidden');
+            } catch(e) {
+                console.error(e);
+                showToast("登錄失敗", "error");
+            }
+        }
+
+        function startTutorial() {
+            isTutorial = true;
+            tutorialStep = 0;
+            document.getElementById('loading-screen').classList.add('opacity-0');
+            setTimeout(() => {
+                document.getElementById('loading-screen').classList.add('hidden');
+                setupTutorialGame();
+            }, 500);
+        }
+
+        function setupTutorialGame() {
+            questions = [
+                { chapter: '新手教學', question: '熱血教師的目標是拯救誰？', options: ['學霸', '學渣', '校長', '外星人'], correctIndex: 1 },
+                { chapter: '新手教學', question: '卡牌出牌需要消耗什麼？', options: ['金錢', '生命', '出牌次數', '體力'], correctIndex: 2 }
+            ];
+            allParsedQuestions = [...questions];
+
+            gameState = {
+                turn: 1, phase: 1, students: [], activeQueue: [], currentStudent: null,
+                deck: [], hand: [], grave: [], handLimit: 5, cardUid: 1000,
+                draftPicksLeft: 0, recycleMax: 0, recycleUsed: 0,
+                eventsDrawnThisTurn: 0, extraDraftOptions: 0,
+                bonusHandLimit: 0, permanentHandLimitBonus: 0,
+                isGameOver: false, currentGrade: '教學'
+            };
+
+            let fakeStudent = {
+                id: 0, name: "小明 (學渣代表)", img: STUDENT_IMAGES[0], s: 40, h: 40, isLazy: false, overwork: 0,
+                isDead: false, abilityUsed: false, abilityName: "無", abilityDesc: "無", auraApplied: false
+            };
+            gameState.students = [fakeStudent];
+            gameState.activeQueue = [fakeStudent];
+            gameState.deck = [];
+            let card1 = createCard(BASE_DECK[0]); 
+            let card2 = createCard(BASE_DECK[3]); 
+            gameState.hand = [card1, card2];
+
+            updateTopBar();
+            renderQueue();
+            gameState.currentStudent = gameState.activeQueue.shift();
+            gameState.currentStudent.playCount = 3;
+            renderActiveStudent();
+            renderHand();
+
+            document.getElementById('tutorial-ui').classList.remove('hidden');
+            document.getElementById('tutorial-ui').classList.add('flex');
+            advanceTutorial();
+        }
+
+        function advanceTutorial() {
+            tutorialStep++;
+            const tText = document.getElementById('tutorial-text');
+            const tBtn = document.getElementById('tutorial-next-btn');
+
+            switch(tutorialStep) {
+                case 1:
+                    tText.innerText = "歡迎來到《熱血教師：搶救學業大作戰》！\n身為班導師，你的目標是透過打出「行動卡牌」來提升學生的【學習力】與【體力】，避免他們因為分數掛零而逃學，或是體力透支而生病。";
+                    break;
+                case 2:
+                    tText.innerText = "請看畫面中央，這是你目前正在指導的學生。\n右上角標示了「剩餘出牌次數」，這代表你對這位學生還能打出多少張牌。健康的學生通常有 3 次出牌機會。";
+                    break;
+                case 3:
+                    tText.innerText = "畫面下方是你的「手牌」。每一張牌都有不同的效果。\n現在，我將替你打出一張【基礎講義】來幫小明補習！";
+                    tBtn.innerText = "讓電腦出牌";
+                    break;
+                case 4:
+                    tBtn.classList.add('hidden');
+                    tText.innerText = "電腦出牌中...";
+                    isComputerPlaying = true;
+                    setTimeout(() => {
+                        playCard(gameState.hand[0].uid);
+                        isComputerPlaying = false;
+                        setTimeout(() => {
+                            tText.innerText = "每當你打出卡牌，就會進入「雙題隨堂測驗」。\n答對題目可以確保卡牌效果發動，全對甚至能獲得 1.2 倍加成！\n現在電腦將替你作答。";
+                            tBtn.classList.remove('hidden');
+                            tBtn.innerText = "讓電腦作答";
+                        }, 500);
+                    }, 1000);
+                    break;
+                case 5:
+                    tBtn.classList.add('hidden');
+                    tText.innerText = "電腦作答中...";
+                    setTimeout(() => {
+                        const q1Opts = document.querySelectorAll('#q1-options .q-option');
+                        if(q1Opts.length > 0) {
+                            isComputerPlaying = true;
+                            q1Opts[q1Data.correctIndex].click(); 
+                            isComputerPlaying = false;
+                        }
+                    }, 1000);
+                    setTimeout(() => {
+                        const q2Opts = document.querySelectorAll('#q2-options .q-option');
+                        if(q2Opts.length > 0) {
+                            isComputerPlaying = true;
+                            q2Opts[q2Data.correctIndex].click(); 
+                            isComputerPlaying = false;
+                        }
+                    }, 2000);
+                    setTimeout(() => {
+                        isComputerPlaying = true;
+                        document.getElementById('submit-answers-btn').click();
+                        isComputerPlaying = false;
+                        setTimeout(() => {
+                            tText.innerText = "太棒了！答題全對，小明的學習力獲得了 1.2 倍的提升！\n（學習力增加了 12 點，卡牌也進入了垃圾場）";
+                            tBtn.classList.remove('hidden');
+                            tBtn.innerText = "下一步";
+                        }, 1000);
+                    }, 3500);
+                    break;
+                case 6:
+                    tText.innerText = "當學生的學習力或體力達到 100 滿分時，會立刻獲得一張強力的【滿分獎勵卡】！\n指導完畢後，你可以隨時點擊中央的「⏩ 結束指導此學生」來換下一位。";
+                    break;
+                case 7:
+                    tText.innerText = "當所有排隊的學生都指導完畢後，就會進入後續的「學生能力發揮」、「備課階段」與刺激的「突發事件抽卡」！\n\n這是一個無盡模式的遊戲，每 5 回合你可以選擇見好就收，或是繼續挑戰更高的極限！\n\n指引到此結束，準備好拯救你的學生了嗎？";
+                    tBtn.innerText = "結束指引，回到主畫面";
+                    break;
+                case 8:
+                    endTutorial();
+                    break;
+            }
+        }
+
+        function endTutorial() {
+            isTutorial = false;
+            document.getElementById('tutorial-ui').classList.add('hidden');
+            document.getElementById('tutorial-ui').classList.remove('flex');
+            document.getElementById('active-student-area').innerHTML = '';
+            document.getElementById('hand-container').innerHTML = '';
+            document.getElementById('student-queue').innerHTML = '';
+            
+            document.getElementById('loading-screen').classList.remove('hidden', 'opacity-0');
+            document.getElementById('chapter-container').classList.add('hidden');
+            document.getElementById('chapter-container').classList.remove('flex');
+            document.getElementById('grade-container').classList.remove('hidden');
+        }
+
+        async function loadQuestions(grade) {
+            gameState.currentGrade = grade;
+            document.getElementById('grade-container').classList.add('hidden');
+            document.getElementById('loading-text').classList.remove('hidden');
+            document.getElementById('loading-text').classList.add('flex');
+            document.getElementById('loading-error').classList.add('hidden');
+
+            try {
+                const url = GRADE_URLS[grade];
+                const response = await fetch(url);
+                if (!response.ok) throw new Error(`HTTP Error: ${response.status}`);
+                const csvText = await response.text();
+                
+                questions = parseQuestions(csvText);
+                if (questions.length < 5) throw new Error("題庫數量過少或解析失敗");
+
+                showChapterSelection();
+            } catch (e) {
+                console.error("載入題庫失敗:", e);
+                const errDiv = document.getElementById('loading-error');
+                errDiv.innerText = `無法載入 Google Sheets。\n正在啟動備用題庫...`;
+                errDiv.classList.remove('hidden');
+                setTimeout(() => { questions = getFallbackQuestions(); showChapterSelection(); }, 2000);
+            }
+        }
+
+        function parseQuestions(csv) {
+            let qList = [];
+            let lines = [];
+            let currentLine = '';
+            let inQuotes = false;
+            
+            for (let i = 0; i < csv.length; i++) {
+                let c = csv[i];
+                if (c === '"') inQuotes = !inQuotes;
+                if (c === '\n' && !inQuotes) {
+                    lines.push(currentLine);
+                    currentLine = '';
+                } else if (c !== '\r') {
+                    currentLine += c;
+                }
+            }
+            if (currentLine) lines.push(currentLine);
+
+            for (let i = 1; i < lines.length; i++) {
+                if(!lines[i].trim()) continue;
+                let cols = [];
+                let currCol = '';
+                let insideQuote = false;
+                for(let j=0; j<lines[i].length; j++) {
+                    let char = lines[i][j];
+                    if(char === '"') { insideQuote = !insideQuote; }
+                    else if(char === ',' && !insideQuote) { cols.push(currCol.trim()); currCol = ''; }
+                    else { currCol += char; }
+                }
+                cols.push(currCol.trim());
+
+                if(cols.length >= 8) {
+                    let options = [cols[3]||'', cols[4]||'', cols[5]||'', cols[6]||''];
+                    let correctStr = cols[7] ? cols[7].trim().toUpperCase() : 'A';
+                    let correctIndex = 0;
+                    if(correctStr === 'A' || correctStr === '1') correctIndex = 0;
+                    else if(correctStr === 'B' || correctStr === '2') correctIndex = 1;
+                    else if(correctStr === 'C' || correctStr === '3') correctIndex = 2;
+                    else if(correctStr === 'D' || correctStr === '4') correctIndex = 3;
+
+                    let chapterName = cols[1] ? cols[1].replace(/^"|"$/g, '').trim() : '未分類章節';
+                    qList.push({ chapter: chapterName, question: cols[2].replace(/^"|"$/g, ''), options: options, correctIndex: correctIndex });
+                }
+            }
+            return qList;
+        }
+
+        function getFallbackQuestions() {
+            return [
+                { chapter: '基礎測驗', question: '1+1=?', options: ['1', '2', '3', '4'], correctIndex: 1 },
+                { chapter: '基礎測驗', question: '9x9=?', options: ['18', '81', '99', '19'], correctIndex: 1 },
+                { chapter: '進階測驗', question: '台灣最高的山是？', options: ['阿里山', '陽明山', '玉山', '雪山'], correctIndex: 2 }
+            ];
+        }
+
+        function showChapterSelection() {
+            allParsedQuestions = [...questions];
+            document.getElementById('loading-text').classList.add('hidden');
+            document.getElementById('loading-text').classList.remove('flex');
+            document.getElementById('loading-error').classList.add('hidden');
+            
+            const chapterContainer = document.getElementById('chapter-container');
+            const chapterButtons = document.getElementById('chapter-buttons');
+            chapterContainer.classList.remove('hidden');
+            chapterContainer.classList.add('flex');
+            
+            chapterButtons.innerHTML = '';
+            selectedChapters.clear();
+            
+            const uniqueChapters = [...new Set(allParsedQuestions.map(q => q.chapter))].filter(Boolean);
+            
+            uniqueChapters.forEach(chap => {
+                const btn = document.createElement('button');
+                btn.className = "p-3 border-2 border-slate-200 rounded-xl text-left font-bold text-slate-600 transition hover:bg-indigo-50 active:scale-95 flex items-center justify-between text-sm";
+                btn.innerHTML = `<span>${chap}</span><span class="text-xl text-transparent transition-colors">✔️</span>`;
+                
+                btn.onclick = () => {
+                    if (selectedChapters.has(chap)) {
+                        selectedChapters.delete(chap);
+                        btn.classList.remove('border-indigo-500', 'bg-indigo-100', 'text-indigo-800');
+                        btn.classList.add('border-slate-200', 'text-slate-600');
+                        btn.querySelector('span:last-child').classList.add('text-transparent');
+                        btn.querySelector('span:last-child').classList.remove('text-indigo-600');
+                    } else {
+                        selectedChapters.add(chap);
+                        btn.classList.add('border-indigo-500', 'bg-indigo-100', 'text-indigo-800');
+                        btn.classList.remove('border-slate-200', 'text-slate-600');
+                        btn.querySelector('span:last-child').classList.remove('text-transparent');
+                        btn.querySelector('span:last-child').classList.add('text-indigo-600');
+                    }
+                    document.getElementById('confirm-chapter-btn').disabled = selectedChapters.size === 0;
+                };
+                chapterButtons.appendChild(btn);
+            });
+        }
+
+        function confirmChaptersAndStart() {
+            if (selectedChapters.size === 0) return;
+            questions = allParsedQuestions.filter(q => selectedChapters.has(q.chapter));
+            
+            while (questions.length > 0 && questions.length < 5) {
+                questions.push({...questions[0]}); 
+            }
+            
+            document.getElementById('loading-screen').classList.add('opacity-0');
+            setTimeout(() => {
+                document.getElementById('loading-screen').classList.add('hidden');
+                initGame();
+            }, 500);
+        }
+
+        function initGame() {
+            createStudents();
+            gameState.deck = [];
+            gameState.turn = 1;
+            gameState.recycleMax = 0;
+            gameState.recycleUsed = 0;
+            gameState.draftPicksLeft = 5;
+            gameState.eventsDrawnThisTurn = 0;
+            gameState.extraDraftOptions = 0;
+            gameState.bonusHandLimit = 0;
+            gameState.permanentHandLimitBonus = 0;
+            gameState.isGameOver = false;
+            startDraftPhase();
+        }
+
+        function createStudents() {
+            gameState.students = [];
+            for (let i = 0; i < 12; i++) {
+                gameState.students.push({
+                    id: i, name: STUDENT_NAMES[i], img: STUDENT_IMAGES[i],
+                    s: Math.floor(Math.random() * 21) + 40, h: Math.floor(Math.random() * 21) + 40, 
+                    isLazy: false, overwork: 0, isDead: false, deathReason: null,
+                    abilityUsed: false, abilityName: getAbilityName(i), abilityDesc: getAbilityDesc(i), abilityIcon: getAbilityIcon(i), auraApplied: false
+                });
+            }
+        }
+
+        function getAbilityName(id) { const names = ["靈光一閃", "帶動氣氛", "分享點心", "體能特訓", "溫故知新", "空間魔法", "點名機器", "記憶消除", "資源回收", "千變萬化", "完全複製", "選項擴充"]; return names[id]; }
+        function getAbilityDesc(id) { const descs = ["新增一張牌到牌庫", "選擇回復 3 位學生偷懶狀態", "選擇回復 3 位學生過勞狀態 (-1層)", "選擇擁有卡片新增隨機能力", "選擇擁有卡片新增隨機能力", "手牌上限永久 +1", "選擇最多 3 位下回合必定上台的學生", "選擇最多 3 張擁有的牌永久刪除", "永久獲得：指導期間可隨時從垃圾場拿回 1 張牌洗回牌庫 (每回合限用1次，可疊加)", "更換擁有的一張牌變成自選牌(3選1)", "完全複製擁有的一張牌", "永久獲得：每次選擇卡牌時，選項數量 +1 (可無限疊加)"]; return descs[id]; }
+        function getAbilityIcon(id) { const icons = ["https://drive.google.com/file/d/19fQxCQ2i7535Ld_IgFRyGgddOIpwOvzR/view?usp=sharing", "https://drive.google.com/file/d/1taPmZ1Is9wVEz8wy5ItTPj8fQF3N92Q4/view?usp=sharing", "https://drive.google.com/file/d/1ROSMz0v786RqXmNSc349kK_bDvso8TiR/view?usp=sharing", "https://drive.google.com/file/d/11TqttUogNADvOmH7e7TneXroDQyBCVWl/view?usp=sharing", "https://drive.google.com/file/d/1KEw867WvEMrikpHaXvIb6qxWIJT5Lga_/view?usp=sharing", "https://drive.google.com/file/d/1PowJweV1dFqZMZ-iXWJc0RCyVkkmohxa/view?usp=sharing", "https://drive.google.com/file/d/1jxDtId1nllS2UG_YvADEfhIBVkLrlTcL/view?usp=sharing", "https://drive.google.com/file/d/1Pov6juEyr6XtumqGua9gXK3t9CW9TeYE/view?usp=sharing", "https://drive.google.com/file/d/1LCQgU-orqI2WxXZV4wmJkitNh0V88YH2/view?usp=sharing", "https://drive.google.com/file/d/1Oj6WTHKX3CzSvqvZaovLK14Z-Oky-2wK/view?usp=sharing", "https://drive.google.com/file/d/1kfg40vzndqrtX5WzUy7SUdKtmlebe0S6/view?usp=sharing", "https://drive.google.com/file/d/1sd6aTAjJ1GGXZMK9Qpce9Uxo70jdBv8v/view?usp=sharing"]; return icons[id]; }
+
+        function createCard(baseObj) {
+            return { uid: gameState.cardUid++, name: baseObj.name, icon: baseObj.icon || "🎴", effects: JSON.parse(JSON.stringify(baseObj.effects)), desc: buildCardDesc(baseObj.effects) };
+        }
+
+        function buildCardDesc(effects) {
+            let descs = []; let isFree = false; let toDeck = false; let isExhaust = false;
+            effects.forEach(e => {
+                let isSpecialStatType = ['condition_no_lazy', 'condition_no_ow', 'grave_scale', 'hand_scale', 'deck_scale', 'discard_all_for_stat', 'grow_on_discard', 'share', 'add_queue', 'aura_h', 'aura_s', 'aura_end_s', 'aura_end_h', 'aura_end_ow'].includes(e.type);
+                if (e.stat === 's' && !isSpecialStatType) descs.push(`學習 ${e.val > 0 ? '+'+e.val : e.val}`);
+                if (e.stat === 'h' && !isSpecialStatType) descs.push(`體力 ${e.val > 0 ? '+'+e.val : e.val}`);
+                if (e.stat === 'lazy' && !isSpecialStatType) descs.push(e.val > 0 ? "獲得偷懶" : "解除偷懶");
+                if (e.stat === 'ow' && !isSpecialStatType) descs.push(e.val > 0 ? `過勞 +${e.val}` : `解除 ${Math.abs(e.val)} 層過勞`);
+                
+                if (e.type === 'draw') descs.push(`抽 ${e.val} 張牌`);
+                if (e.type === 'discard') descs.push(`可拋棄最多 ${e.val} 張牌`);
+                if (e.type === 'discard_all_for_stat') descs.push(`拋棄任意牌，每張獲得 ${e.stat === 's' ? '學習' : '體力'} +${e.val}`); 
+                if (e.type === 'discard_all') descs.push("拋棄所有手牌");
+                if (e.type === 'aura_h') descs.push(`在手牌時，指導開始體力 +${e.val}`);
+                if (e.type === 'aura_s') descs.push(`在手牌時，指導開始學習力 +${e.val}`);
+                if (e.type === 'aura_end_s') descs.push(`在手牌時，結束指導時指導的學生學習力 ${e.val > 0 ? '+'+e.val : e.val}`);
+                if (e.type === 'aura_end_h') descs.push(`在手牌時，結束指導時指導的學生體力 ${e.val > 0 ? '+'+e.val : e.val}`);
+                if (e.type === 'aura_end_ow') descs.push(`在手牌時，結束指導時指導的學生過勞 ${e.val > 0 ? '+'+e.val : e.val}`);
+                if (e.type === 'grave_scale') descs.push(`垃圾場每有 1 張牌，${e.stat==='s'?'學習':'體力'} +${e.val}`);
+                if (e.type === 'hand_scale') descs.push(`手牌每有 1 張牌，${e.stat==='s'?'學習':'體力'} +${e.val}`);
+                if (e.type === 'deck_scale') descs.push(`牌庫每有 1 張牌，${e.stat==='s'?'學習':'體力'} +${e.val}`);
+                if (e.type === 'grow_on_discard') descs.push(`每被拋棄 1 次，此卡永久 ${e.stat==='s'?'學習':'體力'} +${e.val}`);
+                if (e.type === 'add_queue') descs.push(`額外選擇 ${e.val} 名學生加入對列`);
+                if (e.type === 'auto_study') descs.push(`(自學：若被拋棄，僅發動正面效果)`);
+                if (e.type === 'condition_no_lazy') {
+                    if (e.stat === 'h') descs.push(`沒有偷懶時，體力 ${e.val > 0 ? '+'+e.val : e.val}`);
+                    if (e.stat === 's') descs.push(`沒有偷懶時，學習 ${e.val > 0 ? '+'+e.val : e.val}`);
+                    if (e.stat === 'ow') descs.push(`沒有偷懶時，${e.val > 0 ? '過勞 +'+e.val : '解除 '+Math.abs(e.val)+' 層過勞'}`);
+                }
+                if (e.type === 'condition_no_ow') {
+                    if (e.stat === 'h') descs.push(`若過勞為 0，體力 ${e.val > 0 ? '+'+e.val : e.val}`);
+                    if (e.stat === 's') descs.push(`若過勞為 0，學習 ${e.val > 0 ? '+'+e.val : e.val}`);
+                    if (e.stat === 'lazy') descs.push(`若過勞為 0，${e.val > 0 ? '獲得偷懶' : '解除偷懶'}`);
+                }
+                if (e.type === 'share') {
+                    let target = e.count === 'all' ? '所有對列中' : `對列中最多 ${e.count} 名`;
+                    let effectStr = "";
+                    if (e.stat === 'lazy') effectStr = e.val > 0 ? "獲得偷懶" : "解除偷懶";
+                    if (e.stat === 'ow') effectStr = e.val > 0 ? `過勞 +${e.val}` : `解除 ${Math.abs(e.val)} 層過勞`;
+                    if (e.stat === 's') effectStr = `學習力 ${e.val > 0 ? '+'+e.val : e.val}`;
+                    if (e.stat === 'h') effectStr = `體力 ${e.val > 0 ? '+'+e.val : e.val}`;
+                    descs.push(`分享：使${target}學生 ${effectStr}`);
+                }
+                if (e.type === 'search') descs.push(`從牌庫選 ${e.val} 張牌加入手牌`);
+                if (e.type === 'free_play') isFree = true;
+                if (e.type === 'shuffle_back') toDeck = true;
+                if (e.type === 'exhaust') isExhaust = true;
+            });
+            let prefix = isFree ? "⚡不耗次數 " : "";
+            let suffix = "";
+            if (toDeck) suffix += " 🔄回牌庫";
+            if (isExhaust) suffix += " 🔥(消耗)";
+            return prefix + descs.join("，") + suffix;
+        }
+
+        function startDraftPhase() {
+            if (gameState.draftPicksLeft <= 0) {
+                for(let i=0; i<5; i++) {
+                    let randomBase = BASE_DECK[Math.floor(Math.random() * BASE_DECK.length)];
+                    gameState.deck.push(createCard(randomBase));
+                }
+                showToast("牌組建構完成！遊戲正式開始！");
+                startTurn();
+                return;
+            }
+
+            let choices = [];
+            let pool = [...CARD_POOL].sort(() => 0.5 - Math.random());
+            let optionsCount = Math.min(3 + (gameState.extraDraftOptions || 0), pool.length);
+            for(let i=0; i<optionsCount; i++) {
+                if (pool[i]) choices.push(createCard(pool[i]));
+            }
+
+            openSelectionModalCore(choices, 1, true, "初始建構階段", `請選擇 1 張牌加入初始牌庫 (剩餘 ${gameState.draftPicksLeft} 次)`).then(selected => {
+                if(selected.length > 0) {
+                    gameState.deck.push(selected[0]);
+                }
+                gameState.draftPicksLeft--;
+                startDraftPhase();
+            });
+        }
+
+        function getAliveStudents() { return gameState.students.filter(s => !s.isDead); }
+
+        function startTurn() {
+            if (gameState.isGameOver) return;
+            let alive = getAliveStudents();
+            if(alive.length === 0) { endGame(); return; }
+
+            gameState.deck = [...gameState.deck, ...gameState.hand, ...gameState.grave];
+            gameState.hand = []; gameState.grave = [];
+            shuffle(gameState.deck);
+
+            if (gameState.turn === 1) {
+                let lazyCount = Math.floor(Math.random() * 2) + 1;
+                let owTotal = Math.floor(Math.random() * 6) + 1;
+                let shuffledAlive = [...alive].sort(() => 0.5 - Math.random());
+                for(let i=0; i<Math.min(lazyCount, shuffledAlive.length); i++) shuffledAlive[i].isLazy = true;
+                for(let i=0; i<owTotal; i++) alive[Math.floor(Math.random() * alive.length)].overwork += 1;
+                showToast("新學期開始！部分學生已經出現偷懶與過勞症狀！", "info");
+            }
+
+            gameState.phase = 1; gameState.recycleUsed = 0; gameState.eventsDrawnThisTurn = 0; 
+            updateTopBar();
+            
+            let availableUpgrades = [...UPGRADE_POOL].sort(() => 0.5 - Math.random());
+            let upgradeIndex = 0;
+
+            alive.forEach(s => { 
+                s.abilityUsed = false; s.auraApplied = false;
+                if (s.id === 3 || s.id === 4) {
+                    let up = availableUpgrades[upgradeIndex++];
+                    s.tempUpgrade = up;
+                    s.abilityDesc = `選擇擁有的任一張牌新增能力：[${up.text}]`;
+                }
+            });
+
+            gameState.handLimit = 5 + (gameState.permanentHandLimitBonus || 0) + (gameState.bonusHandLimit || 0);
+            gameState.bonusHandLimit = 0;
+
+            let weakStudents = alive.filter(s => s.s < 30 || s.h < 30).sort(() => 0.5 - Math.random());
+            let statusStudents = alive.filter(s => !(s.s < 30 || s.h < 30) && (s.isLazy || s.overwork > 0)).sort(() => 0.5 - Math.random());
+            let normalStudents = alive.filter(s => !(s.s < 30 || s.h < 30) && !s.isLazy && s.overwork === 0).sort(() => 0.5 - Math.random());
+            
+            let chosen = [];
+            if (gameState.guaranteedStudents && gameState.guaranteedStudents.length > 0) {
+                gameState.guaranteedStudents.forEach(gs => {
+                    if (!gs.isDead && chosen.length < 4) {
+                        chosen.push(gs);
+                        weakStudents = weakStudents.filter(ws => ws.id !== gs.id);
+                        statusStudents = statusStudents.filter(ss => ss.id !== gs.id);
+                        normalStudents = normalStudents.filter(ns => ns.id !== gs.id);
+                    }
+                });
+            }
+            gameState.guaranteedStudents = [];
+
+            while(chosen.length < 2) {
+                if (weakStudents.length > 0) chosen.push(weakStudents.pop());
+                else if (statusStudents.length > 0) chosen.push(statusStudents.pop());
+                else if (normalStudents.length > 0) chosen.push(normalStudents.pop());
+                else break;
+            }
+            while(chosen.length < 4) {
+                if (statusStudents.length > 0) chosen.push(statusStudents.pop());
+                else if (weakStudents.length > 0) chosen.push(weakStudents.pop());
+                else if (normalStudents.length > 0) chosen.push(normalStudents.pop());
+                else break;
+            }
+            
+            gameState.activeQueue = chosen.sort(() => 0.5 - Math.random());
+            drawCards(gameState.handLimit);
+            renderHand();
+            nextStudentInQueue();
+        }
+
+        function nextStudentInQueue() {
+            gameState.activeQueue = gameState.activeQueue.filter(s => !s.isDead);
+            if(gameState.activeQueue.length === 0) { endPhase1(); return; }
+            
+            gameState.currentStudent = gameState.activeQueue.shift();
+            gameState.currentStudent.playCount = gameState.currentStudent.isLazy ? 2 : 3; 
+            gameState.currentStudent.auraApplied = false;
+            
+            let cardsToDraw = gameState.handLimit - gameState.hand.length;
+            if (cardsToDraw > 0) drawCards(cardsToDraw);
+            
+            gameState.hand.forEach(c => {
+                c.effects.forEach(e => {
+                    if(e.type === 'aura_h') { gameState.currentStudent.h += e.val; showToast(`${c.name} 發動：體力 +${e.val}`); }
+                    if(e.type === 'aura_s') { gameState.currentStudent.s += e.val; showToast(`${c.name} 發動：學習力 +${e.val}`); }
+                });
+            });
+
+            checkMaxScore(gameState.currentStudent);
+            renderQueue(); renderActiveStudent(); renderHand();
+        }
+
+        function renderQueue() {
+            const q = document.getElementById('student-queue');
+            q.innerHTML = '';
+            gameState.activeQueue.forEach(s => {
+                let statusHtml = '';
+                if(s.isLazy) statusHtml += '<span class="text-[10px] text-red-500 font-bold bg-red-50 px-1 rounded flex items-center border border-red-200">偷懶</span>';
+                if(s.overwork > 0) statusHtml += `<span class="text-[10px] text-orange-500 font-bold bg-orange-50 px-1 rounded flex items-center border border-orange-200 ml-1">過勞x${s.overwork}</span>`;
+
+                q.innerHTML += `
+                    <div class="bg-white p-2 rounded-xl shadow-sm border border-slate-200 flex items-center gap-2 opacity-80">
+                        <div class="text-2xl bg-slate-100 p-1.5 rounded-lg">${s.img}</div>
+                        <div class="flex-1">
+                            <div class="font-bold text-slate-700 flex justify-between text-sm items-center">
+                                <span>${s.name}</span>
+                                <div class="flex">${statusHtml}</div>
+                            </div>
+                            <div class="text-[10px] text-slate-500 flex justify-between mt-1 font-bold">
+                                <span>學:${Math.floor(s.s)}</span> <span>體:${Math.floor(s.h)}</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            if(gameState.activeQueue.length === 0) q.innerHTML = `<div class="text-center text-slate-400 mt-4 text-xs font-bold">目前無排隊學生</div>`;
+        }
+
+        function renderActiveStudent() {
+            const area = document.getElementById('active-student-area');
+            const actionArea = document.getElementById('action-area');
+            if(!gameState.currentStudent || gameState.currentStudent.isDead) {
+                area.innerHTML = ''; actionArea.classList.add('hidden');
+                document.getElementById('hand-overlay').classList.remove('hidden'); return;
+            }
+
+            let s = gameState.currentStudent;
+            let sBar = Math.min(100, Math.max(0, s.s));
+            let hBar = Math.min(100, Math.max(0, s.h));
+            
+            let statusHtml = '';
+            if(s.isLazy) statusHtml += '<span class="bg-red-100 text-red-600 px-2 py-0.5 rounded-md text-[10px] md:text-xs font-black border border-red-200 shadow-sm animate-pulse ml-2">偷懶中 (出牌-1)</span>';
+            if(s.overwork > 0) statusHtml += `<span class="bg-orange-100 text-orange-600 px-2 py-0.5 rounded-md text-[10px] md:text-xs font-black border border-orange-200 shadow-sm ml-2">過勞 x${s.overwork}</span>`;
+
+            area.innerHTML = `
+                <div class="bg-white p-3 md:p-4 rounded-2xl shadow-xl border-4 border-indigo-400 w-full student-active relative overflow-hidden">
+                    <div class="absolute top-0 right-0 bg-indigo-600 text-white px-3 py-1 rounded-bl-xl font-black text-xs md:text-sm shadow-md">
+                        剩餘出牌次數：<span class="text-yellow-300 text-base md:text-lg">${s.playCount}</span>
+                    </div>
+                    <div class="flex items-center gap-3 md:gap-4 mb-2 mt-2">
+                        <div class="text-4xl md:text-5xl bg-indigo-50 p-2 md:p-3 rounded-xl border-2 border-indigo-100 shadow-inner">${s.img}</div>
+                        <div class="flex-1">
+                            <h3 class="text-lg md:text-xl font-black text-slate-800 flex items-center gap-2 mb-1">
+                                ${s.name} ${statusHtml}
+                            </h3>
+                            <div class="mt-1 space-y-2">
+                                <div>
+                                    <div class="flex justify-between text-[10px] md:text-xs font-bold text-slate-600 mb-1">
+                                        <span>學習力 (歸零逃走)</span> <span class="text-xs md:text-sm">${Math.floor(s.s)}/100</span>
+                                    </div>
+                                    <div class="w-full bg-slate-200 rounded-full h-2 md:h-3 shadow-inner"><div class="bg-blue-500 h-2 md:h-3 rounded-full stat-bar shadow" style="width: ${sBar}%"></div></div>
+                                </div>
+                                <div>
+                                    <div class="flex justify-between text-[10px] md:text-xs font-bold text-slate-600 mb-1">
+                                        <span>體力 (歸零生病)</span> <span class="text-xs md:text-sm">${Math.floor(s.h)}/100</span>
+                                    </div>
+                                    <div class="w-full bg-slate-200 rounded-full h-2 md:h-3 shadow-inner"><div class="bg-green-500 h-2 md:h-3 rounded-full stat-bar shadow" style="width: ${hBar}%"></div></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            let recycleLeft = (gameState.recycleMax || 0) - (gameState.recycleUsed || 0);
+            if(recycleLeft > 0) {
+                area.innerHTML += `
+                    <button onclick="useRecycleAbility()" class="mt-2 bg-cyan-600 hover:bg-cyan-500 text-white font-black py-2 px-6 rounded-full shadow-md transition active:scale-95 text-xs md:text-sm border-2 border-cyan-400 flex items-center gap-2">
+                        <span>♻️ 資源回收 (小傑能力) - 剩餘 ${recycleLeft} 次</span>
+                    </button>
+                `;
+            }
+            
+            actionArea.classList.remove('hidden');
+            if(s.playCount <= 0) document.getElementById('hand-overlay').classList.remove('hidden');
+            else document.getElementById('hand-overlay').classList.add('hidden');
+        }
+
+        function renderHand() {
+            const container = document.getElementById('hand-container');
+            container.innerHTML = '';
+            
+            gameState.hand.forEach((card, index) => {
+                let deg = (index - (gameState.hand.length-1)/2) * 5;
+                let yOffset = Math.abs(index - (gameState.hand.length-1)/2) * 5;
+                
+                const cDiv = document.createElement('div');
+                cDiv.className = "bg-white rounded-xl shadow-[0_5px_15px_rgba(0,0,0,0.3)] border-2 border-slate-300 w-36 h-[288px] flex flex-col cursor-pointer card-hover absolute transition-all duration-300 group overflow-hidden shrink-0";
+                cDiv.style.transform = `rotate(${deg}deg) translateY(${yOffset}px)`;
+                cDiv.style.marginLeft = `${index * 65}px`;
+                cDiv.style.left = `calc(50% - ${(gameState.hand.length * 65)/2}px + 30px)`;
+                cDiv.style.bottom = "-10px";
+                
+                let iconHtml = '';
+                if (card.icon) {
+                    if (card.icon.startsWith('http')) {
+                        iconHtml = `<img src="${getSafeImageUrl(card.icon)}" referrerpolicy="no-referrer" class="w-full h-full object-cover pointer-events-none rounded-md">`;
+                    } else {
+                        iconHtml = `<div class="text-6xl flex items-center justify-center w-full h-full">${card.icon}</div>`;
+                    }
+                }
+                
+                cDiv.innerHTML = `
+                    <div class="font-black text-slate-800 border-b-2 border-slate-200 pb-1 text-center text-sm bg-slate-50 pt-2 group-hover:bg-indigo-50 transition-colors z-10 shrink-0 shadow-sm">${card.name}</div>
+                    <div class="h-32 flex items-center justify-center bg-slate-100 overflow-hidden shrink-0 relative border-b border-slate-200 -mx-1">${iconHtml}</div>
+                    <div class="text-[11px] text-slate-700 flex-1 break-words font-medium leading-tight mt-1 overflow-y-auto custom-scrollbar p-2 bg-white">${card.desc}</div>
+                `;
+                
+                cDiv.onclick = () => playCard(card.uid);
+                container.appendChild(cDiv);
+            });
+            updateTopBar();
+        }
+
+        function updateTopBar() {
+            document.getElementById('turn-display').innerText = gameState.turn;
+            const phaseNames = ["指導學生", "學生能力發動", "備課階段", "突發狀況"];
+            document.getElementById('phase-display').innerText = `階段 ${gameState.phase}：${phaseNames[gameState.phase - 1]}`;
+            document.getElementById('deck-count').innerText = gameState.deck.length;
+            document.getElementById('grave-count').innerText = gameState.grave.length;
+            document.getElementById('hand-limit-display').innerText = gameState.handLimit;
+            document.getElementById('alive-count').innerText = getAliveStudents().length + "/" + gameState.students.length;
+        }
+
+        function endCurrentStudent() {
+            if(isTutorial) { showToast("教學模式中，請跟隨指引操作", "info"); return; }
+            if(!gameState.currentStudent) return;
+            if (gameState.currentStudent.isDead) { nextStudentInQueue(); return; }
+
+            let s = gameState.currentStudent;
+            let aurasTriggered = false;
+            
+            if (!s.auraApplied) {
+                s.auraApplied = true;
+                gameState.hand.forEach(c => {
+                    c.effects.forEach(e => {
+                        if (e.type === 'aura_end_s') { s.s += e.val; aurasTriggered = true; showToast(`懲罰效果：${s.name} 學習力 ${e.val}`, "error"); }
+                        if (e.type === 'aura_end_h') { s.h += e.val; aurasTriggered = true; showToast(`懲罰效果：${s.name} 體力 ${e.val}`, "error"); }
+                        if (e.type === 'aura_end_ow') { 
+                            s.overwork += e.val; 
+                            if(s.overwork < 0) s.overwork = 0; 
+                            aurasTriggered = true; 
+                            showToast(`懲罰效果：${s.name} 過勞 ${e.val > 0 ? '+'+e.val : e.val}`, e.val < 0 ? "success" : "error"); 
+                        }
+                    });
+                });
+
+                if (s.overwork > 0) {
+                    let overworkPenalty = s.overwork * 5;
+                    s.h -= overworkPenalty;
+                    aurasTriggered = true;
+                    showToast(`過勞懲罰：${s.name} 因過勞流失 ${overworkPenalty} 點體力！`, "error");
+                }
+
+                if (aurasTriggered) {
+                    checkCollapse(s); checkDeath(s); renderActiveStudent(); 
+                    if (s.isDead) return;
+                }
+            }
+            nextStudentInQueue();
+        }
+
+        function drawCards(amount) {
+            for(let i=0; i<amount; i++) {
+                if(gameState.deck.length === 0) break;
+                gameState.hand.push(gameState.deck.pop());
+            }
+        }
+
+        async function playCard(uid) {
+            if (isTutorial && !isComputerPlaying) { showToast("教學模式中，請跟隨指引操作", "info"); return; }
+            let s = gameState.currentStudent;
+            if(!s || s.playCount <= 0 || s.isDead) return;
+            
+            let cardIndex = gameState.hand.findIndex(c => c.uid === uid);
+            if(cardIndex === -1) return;
+            let card = gameState.hand[cardIndex];
+
+            gameState.hand.splice(cardIndex, 1);
+            
+            let isFree = card.effects.some(e => e.type === 'free_play');
+            if(!isFree) s.playCount--;
+            
+            gameState.pendingCard = card;
+            gameState.pendingCardS = s;
+            
+            renderHand(); renderActiveStudent(); showTwoQuestions();
+        }
+
+        function showTwoQuestions() {
+            if (questions.length < 2) return;
+            let shuffled = isTutorial ? [...questions] : [...questions].sort(() => 0.5 - Math.random());
+            q1Data = shuffled[0]; q2Data = shuffled[1];
+            selectedAns1 = null; selectedAns2 = null;
+            
+            document.getElementById('q-chapter').innerText = q1Data.chapter + " / " + q2Data.chapter;
+            renderQuestionOptions(1, q1Data);
+            renderQuestionOptions(2, q2Data);
+            
+            document.getElementById('submit-answers-btn').disabled = true;
+            document.getElementById('question-modal').classList.remove('hidden');
+            document.getElementById('question-modal').classList.add('flex');
+        }
+
+        function renderQuestionOptions(qNum, qData) {
+            document.getElementById(`q${qNum}-text`).innerText = qData.question;
+            const container = document.getElementById(`q${qNum}-options`);
+            container.innerHTML = '';
+            
+            qData.options.forEach((opt, idx) => {
+                if(!opt) return;
+                let btn = document.createElement('button');
+                btn.className = `q-option bg-white hover:bg-indigo-50 border-2 border-slate-200 text-slate-700 font-bold py-2 px-3 rounded-xl text-left flex items-center w-full shadow-sm text-sm`;
+                btn.innerHTML = `<span class="bg-slate-100 text-slate-600 w-6 h-6 rounded-full flex items-center justify-center mr-2 shrink-0 font-black border border-slate-300 shadow-sm text-xs">${['A','B','C','D'][idx]}</span> <span>${opt}</span>`;
+                
+                btn.onclick = () => {
+                    if (isTutorial && !isComputerPlaying) return;
+                    Array.from(container.children).forEach(c => c.classList.remove('selected', 'border-indigo-500', 'bg-indigo-50'));
+                    btn.classList.add('selected', 'border-indigo-500', 'bg-indigo-50');
+                    if(qNum === 1) selectedAns1 = idx; else selectedAns2 = idx;
+                    if(selectedAns1 !== null && selectedAns2 !== null) document.getElementById('submit-answers-btn').disabled = false;
+                };
+                container.appendChild(btn);
+            });
+        }
+
+        async function submitAnswers() {
+            if (isTutorial && !isComputerPlaying) return;
+            document.getElementById('question-modal').classList.add('hidden');
+            document.getElementById('question-modal').classList.remove('flex');
+            
+            let correct1 = (selectedAns1 === q1Data.correctIndex);
+            let correct2 = (selectedAns2 === q2Data.correctIndex);
+            let multiplier = (correct1 && correct2) ? 1.2 : ((correct1 || correct2) ? 1.0 : 0);
+            
+            if(multiplier === 0) {
+                let box = document.getElementById('active-student-area').firstElementChild;
+                if(box) { box.classList.add('shake'); setTimeout(() => box.classList.remove('shake'), 500); }
+                showToast("兩題皆錯，卡牌無效！並增加 1 層過勞", "error");
+                if (gameState.pendingCardS && !gameState.pendingCardS.isDead) { gameState.pendingCardS.overwork += 1; }
+                finishCardPlay(gameState.pendingCard); 
+            } else {
+                if(multiplier === 1.2) showToast("完全正確！卡牌正向數值 1.2 倍！", "success");
+                else showToast("答對一題，卡牌正常發動！", "info");
+                await resolveCardEffects(multiplier);
+            }
+            
+            if (gameState.pendingCardS) { checkCollapse(gameState.pendingCardS); renderActiveStudent(); }
+            renderHand();
+        }
+
+        async function resolveCardEffects(multiplier) {
+            let card = gameState.pendingCard; let s = gameState.pendingCardS;
+            await applyCardEffectsProcess(card, s, multiplier);
+            finishCardPlay(card);
+            checkCollapse(s); checkDeath(s); if(!s.isDead) checkMaxScore(s);
+            renderActiveStudent(); renderHand();
+        }
+        
+        function finishCardPlay(card) {
+            let isExhaust = card.effects.some(e => e.type === 'exhaust');
+            let toDeck = card.effects.some(e => e.type === 'shuffle_back');
+            if (!isExhaust) {
+                if(toDeck) { gameState.deck.push(card); shuffle(gameState.deck); }
+                else { gameState.grave.push(card); }
+            }
+            gameState.pendingCard = null; gameState.pendingCardS = null; updateTopBar();
+        }
+
+        async function applyCardEffectsProcess(card, student, multiplier) {
+            for(let e of card.effects) {
+                let isSpecialStatType = ['condition_no_lazy', 'condition_no_ow', 'grave_scale', 'hand_scale', 'deck_scale', 'discard_all_for_stat', 'grow_on_discard', 'share', 'add_queue', 'aura_h', 'aura_s', 'aura_end_s', 'aura_end_h', 'aura_end_ow'].includes(e.type);
+                let val = e.val;
+
+                if((e.stat === 's' || e.stat === 'h') && val && !isSpecialStatType && val > 0) val = Math.round(val * multiplier);
+
+                if(e.stat === 's' && !isSpecialStatType) student.s += val;
+                if(e.stat === 'h' && !isSpecialStatType) student.h += val;
+                if(e.stat === 'lazy' && !isSpecialStatType) { student.isLazy = val > 0; }
+                if(e.stat === 'ow' && !isSpecialStatType) { student.overwork = Math.max(0, student.overwork + val); }
+                if(e.type === 'draw') drawCards(e.val);
+                
+                if(e.type === 'grave_scale') {
+                    let bonus = e.val > 0 ? Math.round(gameState.grave.length * e.val * multiplier) : (gameState.grave.length * e.val);
+                    if(e.stat === 's') student.s += bonus; if(e.stat === 'h') student.h += bonus;
+                }
+                if(e.type === 'hand_scale') {
+                    let bonus = e.val > 0 ? Math.round(gameState.hand.length * e.val * multiplier) : (gameState.hand.length * e.val);
+                    if(e.stat === 's') student.s += bonus; if(e.stat === 'h') student.h += bonus;
+                }
+                if(e.type === 'deck_scale') {
+                    let bonus = e.val > 0 ? Math.round(gameState.deck.length * e.val * multiplier) : (gameState.deck.length * e.val);
+                    if(e.stat === 's') student.s += bonus; if(e.stat === 'h') student.h += bonus;
+                }
+                
+                if(e.type === 'condition_no_lazy' && !student.isLazy) {
+                    if(e.stat === 'h') student.h += val; if(e.stat === 's') student.s += val;
+                    if(e.stat === 'ow') { student.overwork = Math.max(0, student.overwork + val); }
+                }
+                
+                if(e.type === 'condition_no_ow' && student.overwork === 0) {
+                    if(e.stat === 'h') student.h += val; if(e.stat === 's') student.s += val;
+                    if(e.stat === 'lazy') { student.isLazy = val > 0; }
+                }
+
+                if(e.type === 'add_queue') {
+                    let candidates = getAliveStudents().filter(s => s.id !== student.id && !gameState.activeQueue.find(q => q.id === s.id));
+                    if(candidates.length > 0) {
+                        let choices = candidates.map(c => ({ uid: 'addq_'+c.id, name: c.name, desc: `學習: ${Math.floor(c.s)}, 體力: ${Math.floor(c.h)}`, icon: c.img, originalId: c.id }));
+                        let maxSelect = Math.min(e.val, choices.length);
+                        let picked = await openSelectionModalCore(choices, maxSelect, false, "呼叫同學", `選擇最多 ${maxSelect} 名學生加入對列`);
+                        picked.forEach(p => {
+                            let st = gameState.students[p.originalId];
+                            if(st) { gameState.activeQueue.push(st); showToast(`${st.name} 已被加入對列！`, "info"); }
+                        });
+                        renderQueue();
+                    } else { showToast("沒有其他學生可以加入對列了！", "info"); }
+                }
+
+                if(e.type === 'share' && gameState.activeQueue.length > 0) {
+                    let targetStudents = [];
+                    if(e.count === 'all') targetStudents = [...gameState.activeQueue];
+                    else {
+                        let choices = gameState.activeQueue.map(c => ({ uid: 'share_'+c.id, name: c.name, desc: `學習: ${Math.floor(c.s)}, 體力: ${Math.floor(c.h)}`, icon: c.img, originalId: c.id }));
+                        let maxSelect = Math.min(e.count, choices.length);
+                        let picked = await openSelectionModalCore(choices, maxSelect, false, "分享效果", `選擇最多 ${maxSelect} 名對列中的學生受到影響`);
+                        picked.forEach(p => { let st = gameState.activeQueue.find(q => q.id === p.originalId); if(st) targetStudents.push(st); });
+                    }
+                    
+                    if(targetStudents.length > 0) {
+                        targetStudents.forEach(st => {
+                            let effectVal = e.val;
+                            if ((e.stat === 's' || e.stat === 'h') && e.val > 0) effectVal = Math.round(e.val * multiplier);
+                            if(e.stat === 's') st.s += effectVal; if(e.stat === 'h') st.h += effectVal;
+                            if(e.stat === 'lazy') st.isLazy = e.val > 0;
+                            if(e.stat === 'ow') st.overwork = Math.max(0, st.overwork + e.val);
+                            checkCollapse(st); checkDeath(st);
+                        });
+                        showToast(`效果已分享至選定的學生！`, "success");
+                        gameState.activeQueue = gameState.activeQueue.filter(s => !s.isDead);
+                        renderQueue();
+                    }
+                }
+
+                if(e.type === 'discard' && gameState.hand.length > 0) {
+                    let res = await openSelectionModalCore(gameState.hand, e.val, false, "拋棄卡牌", `選擇最多 ${e.val} 張牌拋棄\n(可直接確認跳過)`);
+                    res.forEach(c => handleDiscardEffect(c.uid));
+                }
+                
+                if(e.type === 'discard_all_for_stat' && gameState.hand.length > 0) {
+                    let res = await openSelectionModalCore(gameState.hand, gameState.hand.length, false, "拋棄卡牌", "選擇任意數量卡牌拋棄\n(可直接確認跳過)");
+                    let count = res.length; res.forEach(c => handleDiscardEffect(c.uid));
+                    let totalVal = e.val > 0 ? Math.round(count * e.val * multiplier) : (count * e.val);
+                    if(e.stat === 's') student.s += totalVal; if(e.stat === 'h') student.h += totalVal;
+                }
+                
+                if(e.type === 'discard_all') { [...gameState.hand].forEach(c => handleDiscardEffect(c.uid)); }
+
+                if(e.type === 'search' && gameState.deck.length > 0) {
+                    let res = await openSelectionModalCore(gameState.deck, e.val, true, "檢索牌庫", `選擇 ${e.val} 張牌加入手牌`);
+                    res.forEach(c => {
+                        let idx = gameState.deck.findIndex(dc => dc.uid === c.uid);
+                        if(idx > -1) gameState.hand.push(gameState.deck.splice(idx, 1)[0]);
+                    });
+                    shuffle(gameState.deck);
+                }
+            }
+        }
+
+        function handleDiscardEffect(uid) {
+            let idx = gameState.hand.findIndex(c => c.uid === uid);
+            if(idx > -1) {
+                let discardedCard = gameState.hand.splice(idx, 1)[0];
+                let isExhaust = discardedCard.effects.some(e => e.type === 'exhaust');
+                if (!isExhaust) gameState.grave.push(discardedCard);
+                
+                if(discardedCard.effects.some(e => e.type === 'grow_on_discard')) {
+                    discardedCard.effects.forEach(e => {
+                        if(e.type === 'grow_on_discard') {
+                            let baseEffect = discardedCard.effects.find(ef => ef.stat === e.stat && !ef.type);
+                            if(baseEffect) baseEffect.val += e.val; else discardedCard.effects.push({stat: e.stat, val: e.val});
+                        }
+                    });
+                    discardedCard.desc = buildCardDesc(discardedCard.effects);
+                    showToast(`觸發鍛鍊：${discardedCard.name} 永久增強了！`, "success");
+                }
+                
+                if(discardedCard.effects.some(e => e.type === 'auto_study') && gameState.currentStudent && !gameState.currentStudent.isDead) {
+                    showToast(`觸發自學：${discardedCard.name} (僅發動正面效果)！`, "success");
+                    discardedCard.effects.forEach(e => {
+                        if(e.stat === 's' && e.val > 0) gameState.currentStudent.s += e.val;
+                        if(e.stat === 'h' && e.val > 0) gameState.currentStudent.h += e.val;
+                        if(e.stat === 'lazy' && e.val < 0) gameState.currentStudent.isLazy = false;
+                        if(e.stat === 'ow' && e.val < 0) { gameState.currentStudent.overwork = Math.max(0, gameState.currentStudent.overwork + e.val); }
+                    });
+                    checkCollapse(gameState.currentStudent); checkDeath(gameState.currentStudent);
+                }
+            }
+        }
+
+        function checkCollapse(s) {
+            if (s.isDead) return;
+            if (s.overwork >= 5) {
+                showToast(`${s.name} 過勞倒下！體力大幅下降並陷入偷懶！`, "error");
+                s.overwork = 0; s.isLazy = true; s.h -= 20; checkDeath(s); 
+            }
+        }
+
+        function checkDeath(s) {
+            if(s.isDead) return;
+            let died = false;
+            if(s.s <= 0) {
+                s.isDead = true; s.deathReason = 'escaped'; s.s = 0;
+                showToast(`【警告】${s.name} 學習力歸零，受不了逃學了！`, "error"); died = true;
+            } else if(s.h <= 0) {
+                s.isDead = true; s.deathReason = 'sick'; s.h = 0;
+                showToast(`【警告】${s.name} 體力透支，生病送醫了！`, "error"); died = true;
+            }
+
+            if (died) {
+                let penaltyCard = createCard(PENALTY_CARDS[Math.floor(Math.random() * PENALTY_CARDS.length)]);
+                gameState.hand.push(penaltyCard);
+                showToast(`學生退場懲罰：獲得一張【${penaltyCard.name}】到手牌中！`, "error");
+                renderHand();
+                if(gameState.currentStudent && gameState.currentStudent.id === s.id) setTimeout(endCurrentStudent, 1500);
+            }
+            updateTopBar();
+            
+            if (gameState.students.filter(st => st.isDead).length >= 3 && !gameState.isGameOver) {
+                gameState.isGameOver = true;
+                showToast("【警告】已有 3 名學生退場，遊戲宣告失敗！", "error");
+                setTimeout(endGame, 1500);
+            }
+        }
+
+        function checkMaxScore(s) {
+            if(s.isDead) return;
+            let gotReward = false;
+            let rewards = [
+                { name: "滿分獎勵(學)", icon: "https://drive.google.com/file/d/1aiQOlHMy-utxtzl6uYNKmkgx2tBWSgG1/view?usp=sharing", effects: [{ stat: 's', val: 20 }, { stat: 'lazy', val: -1 }, { type: 'free_play' }, { type: 'exhaust' }] },
+                { name: "滿分獎勵(體)", icon: "https://drive.google.com/file/d/1ZSs1qMyhmWnm4LeNkgCqDkhLf5pR9eyI/view?usp=sharing", effects: [{ stat: 'h', val: 30 }, { stat: 'lazy', val: -1 }, { type: 'free_play' }, { type: 'exhaust' }] },
+                { name: "滿分獎勵(舒)", icon: "https://drive.google.com/file/d/1LoZ9J_rTl6tsGjCovl-CelMaD90KQ_x3/view?usp=sharing", effects: [{ stat: 'ow', val: -4 }, { stat: 'lazy', val: -1 }, { type: 'free_play' }, { type: 'exhaust' }] }
+            ];
+
+            if(s.s >= 100 && !s.sRewardClaimed) { s.sRewardClaimed = true; gotReward = true; } else if (s.s < 100) { s.sRewardClaimed = false; }
+            if(s.h >= 100 && !s.hRewardClaimed) { s.hRewardClaimed = true; gotReward = true; } else if (s.h < 100) { s.hRewardClaimed = false; }
+
+            if(gotReward) {
+                showToast(`${s.name} 突破滿分 100！獲得獎勵卡 (直接入手)！`, "success");
+                gameState.hand.push(createCard(rewards[Math.floor(Math.random() * rewards.length)]));
+                renderHand();
+            }
+        }
+
+        function endPhase1() {
+            if (gameState.turn % 5 === 0 && !isTutorial && !gameState.isGameOver) {
+                document.getElementById('continue-turn').innerText = gameState.turn;
+                document.getElementById('continue-modal').classList.remove('hidden');
+                document.getElementById('continue-modal').classList.add('flex');
+            } else { setTimeout(startPhase2, 800); }
+        }
+        
+        function resumeEndless() {
+            document.getElementById('continue-modal').classList.add('hidden');
+            document.getElementById('continue-modal').classList.remove('flex');
+            setTimeout(startPhase2, 300);
+        }
+
+        function startPhase2() {
+            gameState.phase = 2; updateTopBar();
+            let capableStudents = getAliveStudents().filter(s => !s.isLazy);
+
+            if(capableStudents.length === 0) {
+                showToast("所有存活學生都在偷懶，本回合無法發動能力！", "error");
+                setTimeout(startPhase3, 1500); return;
+            }
+
+            let choices = capableStudents.map(s => ({ uid: 'student_' + s.id, name: s.name + " - " + s.abilityName, desc: s.abilityDesc, icon: s.abilityIcon, originalId: s.id }));
+            
+            openSelectionModalCore(choices, 1, false, "階段 2：學生能力發揮", "全班無偷懶的存活學生中，可選擇一名發動其特殊能力\n(也可直接跳過)").then(selected => {
+                if(selected.length > 0) executeStudentAbility(selected[0].originalId);
+                else setTimeout(startPhase3, 800);
+            });
+        }
+
+        async function executeStudentAbility(id) {
+            let alive = getAliveStudents(); let s = gameState.students[id];
+            const getStudentsChoices = (filterFn = null) => (filterFn ? alive.filter(filterFn) : alive).map(ts => ({ uid: 'stu_' + ts.id, name: ts.name, icon: ts.img, desc: `學習: ${Math.floor(ts.s)}, 體力: ${Math.floor(ts.h)}, 過勞: ${ts.overwork}${ts.isLazy ? ' (偷懶)' : ''}`, originalId: ts.id }));
+            const getAllOwnedCards = () => [...gameState.deck, ...gameState.hand, ...gameState.grave];
+
+            const upgradeCard = async () => {
+                let allCards = getAllOwnedCards();
+                if(allCards.length === 0) { showToast("擁有的牌庫為空，無法強化！", "error"); return; }
+                let res = await openSelectionModalCore(allCards, 1, true, s.abilityName, `選擇一張卡片新增能力：[${s.tempUpgrade.text}]`);
+                if(res.length > 0) {
+                    let card = allCards.find(c => c.uid === res[0].uid);
+                    if(card) {
+                        let up = { ...s.tempUpgrade }; delete up.text; 
+                        card.effects.push(up); card.desc = buildCardDesc(card.effects);
+                        showToast(`強化成功：${card.name} 獲得新屬性！`, "success"); renderHand();
+                    }
+                }
+            };
+
+            switch(id) {
+                case 0:
+                    let pool = [...CARD_POOL].sort(() => 0.5 - Math.random());
+                    let optionsCount = Math.min(5 + (gameState.extraDraftOptions || 0), pool.length);
+                    let choices0 = Array.from({length: optionsCount}, (_, i) => createCard(pool[i]));
+                    let picked0 = await openSelectionModalCore(choices0, 1, true, s.abilityName, `請選擇 1 張新卡牌加入牌庫 (${optionsCount}選1)`);
+                    if(picked0.length > 0) { gameState.deck.push(picked0[0]); shuffle(gameState.deck); showToast(`獲得 ${picked0[0].name}！`, "success"); }
+                    break;
+                case 1:
+                    let lazyChoices = getStudentsChoices(ts => ts.isLazy);
+                    if(lazyChoices.length === 0) { showToast("目前無人偷懶，無須發動！", "error"); break; }
+                    let pick1 = await openSelectionModalCore(lazyChoices, Math.min(3, lazyChoices.length), false, s.abilityName, "選擇最多 3 位學生解除偷懶");
+                    pick1.forEach(p => { gameState.students[p.originalId].isLazy = false; });
+                    if(pick1.length > 0) showToast("已解除選定學生的偷懶狀態！", "success");
+                    break;
+                case 2:
+                    let owChoices = getStudentsChoices(ts => ts.overwork > 0);
+                    if(owChoices.length === 0) { showToast("目前無人過勞，無須發動！", "error"); break; }
+                    let pick2 = await openSelectionModalCore(owChoices, Math.min(3, owChoices.length), false, s.abilityName, "選擇最多 3 位學生解除 1 層過勞");
+                    pick2.forEach(p => { let t = gameState.students[p.originalId]; t.overwork = Math.max(0, t.overwork - 1); });
+                    if(pick2.length > 0) showToast("已減輕選定學生的過勞狀態！", "success");
+                    break;
+                case 3: case 4: await upgradeCard(); break;
+                case 5:
+                    gameState.permanentHandLimitBonus = (gameState.permanentHandLimitBonus || 0) + 1;
+                    showToast("手牌上限永久 +1！", "success"); break;
+                case 6:
+                    let maxPick = Math.min(3, alive.length);
+                    let pick6 = await openSelectionModalCore(getStudentsChoices(), maxPick, false, s.abilityName, `選擇最多 ${maxPick} 位下回合必定上台的學生`);
+                    if(pick6.length > 0) {
+                        gameState.guaranteedStudents = pick6.map(p => gameState.students[p.originalId]);
+                        showToast(`${gameState.guaranteedStudents.map(gs => gs.name).join('、')} 下回合必定上台排隊！`, "success");
+                    }
+                    break;
+                case 7:
+                    let allCards7 = getAllOwnedCards();
+                    if(allCards7.length === 0) { showToast("牌庫為空，無法刪除！", "error"); break; }
+                    let pick7 = await openSelectionModalCore(allCards7, Math.min(3, allCards7.length), false, s.abilityName, `選擇最多 3 張要永久刪除的牌`);
+                    if(pick7.length > 0) {
+                        let removedNames = [];
+                        pick7.forEach(p => {
+                            let r = null, idx = gameState.deck.findIndex(c => c.uid === p.uid);
+                            if(idx > -1) r = gameState.deck.splice(idx, 1)[0];
+                            else if((idx = gameState.hand.findIndex(c => c.uid === p.uid)) > -1) r = gameState.hand.splice(idx, 1)[0];
+                            else if((idx = gameState.grave.findIndex(c => c.uid === p.uid)) > -1) r = gameState.grave.splice(idx, 1)[0];
+                            if (r) removedNames.push(r.name);
+                        });
+                        if (removedNames.length > 0) showToast(`已永久刪除：${removedNames.join('、')}！`, "success");
+                        renderHand();
+                    }
+                    break;
+                case 8:
+                    gameState.recycleMax = (gameState.recycleMax || 0) + 1;
+                    showToast(`小傑能力發動！每回合指導期間資源回收次數增加至 ${gameState.recycleMax} 次！`, "success"); break;
+                case 9:
+                    let allCards9 = getAllOwnedCards();
+                    if(allCards9.length === 0) { showToast("牌庫為空，無法更換！", "error"); break; }
+                    let pick9 = await openSelectionModalCore(allCards9, 1, true, s.abilityName, "選擇一張牌準備替換");
+                    if(pick9.length > 0) {
+                        let rPool = [...CARD_POOL].sort(() => 0.5 - Math.random());
+                        let optCount = Math.min(3 + (gameState.extraDraftOptions || 0), rPool.length);
+                        let draftChoices = Array.from({length: optCount}, (_, i) => createCard(rPool[i]));
+                        let pickNew = await openSelectionModalCore(draftChoices, 1, true, s.abilityName, `請選擇 1 張新卡牌替換剛才選擇的卡片 (${optCount}選1)`);
+                        if(pickNew.length > 0) {
+                            let idx = gameState.deck.findIndex(c => c.uid === pick9[0].uid);
+                            if(idx > -1) gameState.deck.splice(idx, 1);
+                            else if((idx = gameState.hand.findIndex(c => c.uid === pick9[0].uid)) > -1) gameState.hand.splice(idx, 1);
+                            else if((idx = gameState.grave.findIndex(c => c.uid === pick9[0].uid)) > -1) gameState.grave.splice(idx, 1);
+                            gameState.deck.push(pickNew[0]); shuffle(gameState.deck);
+                            showToast(`已替換為 ${pickNew[0].name}！`, "success"); renderHand();
+                        }
+                    }
+                    break;
+                case 10:
+                    let allCards10 = getAllOwnedCards();
+                    if(allCards10.length === 0) { showToast("牌庫為空，無法複製！", "error"); break; }
+                    let pick10 = await openSelectionModalCore(allCards10, 1, true, s.abilityName, "選擇一張牌進行完全複製");
+                    if(pick10.length > 0) {
+                        let newCard = createCard(pick10[0]); gameState.deck.push(newCard); shuffle(gameState.deck);
+                        showToast(`已成功複製 ${newCard.name}！`, "success");
+                    }
+                    break;
+                case 11:
+                    gameState.extraDraftOptions = (gameState.extraDraftOptions || 0) + 1;
+                    showToast("選項擴充發動！未來選牌時選項將永久 +1！", "success"); break;
+            }
+            
+            alive.forEach(x => checkDeath(x));
+            if (!gameState.isGameOver) setTimeout(startPhase3, 800);
+        }
+
+        function startPhase3() {
+            gameState.phase = 3; updateTopBar();
+            let pool = [...CARD_POOL].sort(() => 0.5 - Math.random());
+            let optionsCount = Math.min(3 + (gameState.extraDraftOptions || 0), pool.length);
+            let choices = Array.from({length: optionsCount}, (_, i) => createCard(pool[i]));
+            
+            openSelectionModalCore(choices, 1, true, "階段 3：備課階段", `請選擇 1 張新卡牌加入牌庫 (${optionsCount}選1)`).then(selected => {
+                if(selected.length > 0) { gameState.deck.push(selected[0]); showToast(`獲得 ${selected[0].name}！`, "success"); }
+                setTimeout(startPhase4, 500);
+            });
+        }
+
+        function startPhase4() {
+            gameState.phase = 4; updateTopBar();
+            if (typeof gameState.eventsDrawnThisTurn === 'undefined') gameState.eventsDrawnThisTurn = 0;
+
+            let requiredDraws = gameState.turn > 5 ? Math.floor((gameState.turn - 6) / 10) + 2 : 1;
+            let currentDraw = gameState.eventsDrawnThisTurn + 1;
+            let events = [...NEGATIVE_EVENTS].sort(() => 0.5 - Math.random()).slice(0, 3);
+            
+            let hasDrawn = false;
+            const eventModal = document.getElementById('event-modal');
+            const eventGrid = document.getElementById('event-grid');
+            document.getElementById('event-desc').innerText = requiredDraws > 1 ? `請抽取命運卡片決定發生的事件 (第 ${currentDraw}/${requiredDraws} 次抽取)` : "請抽取 1 張命運卡片決定發生的事件";
+            eventGrid.innerHTML = '';
+            
+            events.forEach((ev) => {
+                let cardDiv = document.createElement('div');
+                cardDiv.className = "w-40 h-60 bg-slate-800 rounded-2xl border-4 border-slate-600 shadow-xl cursor-pointer transition-all hover:-translate-y-2 hover:shadow-2xl flex items-center justify-center relative overflow-hidden group";
+                cardDiv.innerHTML = `
+                    <div class="absolute inset-0 bg-indigo-900 opacity-50 bg-[repeating-linear-gradient(45deg,transparent,transparent_10px,rgba(255,255,255,0.1)_10px,rgba(255,255,255,0.1)_20px)]"></div>
+                    <div class="text-5xl drop-shadow-lg group-hover:animate-pulse relative z-10 text-white">❓</div>
+                    <div class="absolute bottom-3 text-slate-300 font-bold tracking-widest z-10 text-xs">點擊抽取</div>
+                `;
+                
+                cardDiv.onclick = () => {
+                    if(hasDrawn) return; hasDrawn = true;
+                    cardDiv.className = "w-40 h-[288px] bg-white rounded-2xl border-4 border-red-500 shadow-[0_0_20px_rgba(239,68,68,0.5)] flex flex-col items-stretch justify-start animate-[flip_0.6s_ease-out] z-10 scale-105 transform overflow-hidden shrink-0";
+                    
+                    let iconHtml = ev.icon && ev.icon.startsWith('http') ? `<img src="${getSafeImageUrl(ev.icon)}" referrerpolicy="no-referrer" class="w-full h-full object-cover pointer-events-none rounded-md">` : `<div class="text-5xl">${ev.icon || '⚠️'}</div>`;
+                    
+                    cardDiv.innerHTML = `
+                        <div class="font-black text-red-600 border-b-2 border-red-100 pb-1 text-center text-sm bg-red-50 pt-2 truncate z-10 shadow-sm shrink-0 px-1">${ev.title}</div>
+                        <div class="h-32 flex items-center justify-center bg-slate-50 overflow-hidden shrink-0 relative border-b border-slate-200 -mx-1">${iconHtml}</div>
+                        <div class="text-[11px] text-slate-700 font-medium leading-tight text-center mt-1 flex-1 p-2 custom-scrollbar overflow-y-auto bg-white">${ev.desc}</div>
+                    `;
+                    
+                    Array.from(eventGrid.children).forEach(c => { if(c !== cardDiv) c.classList.add('opacity-30', 'scale-90', 'grayscale', 'pointer-events-none'); });
+                    
+                    showToast(`觸發事件：${ev.title}`, "error"); ev.fn();
+                    
+                    setTimeout(() => {
+                        eventModal.classList.add('hidden'); eventModal.classList.remove('flex');
+                        getAliveStudents().forEach(x => { checkCollapse(x); checkDeath(x); });
+                        gameState.eventsDrawnThisTurn++;
+                        if (!gameState.isGameOver && gameState.eventsDrawnThisTurn < requiredDraws) setTimeout(startPhase4, 500);
+                        else if (!gameState.isGameOver) {
+                            gameState.eventsDrawnThisTurn = 0;
+                            setTimeout(() => { gameState.turn++; startTurn(); }, 1000);
+                        }
+                    }, 2500);
+                };
+                eventGrid.appendChild(cardDiv);
+            });
+            eventModal.classList.remove('hidden'); eventModal.classList.add('flex');
+        }
+
+        function applyRandomStudentsEvent(min, max, action) {
+            let alive = getAliveStudents();
+            let count = Math.floor(Math.random() * (max - min + 1)) + min;
+            [...alive].sort(() => 0.5 - Math.random()).slice(0, count).forEach(action);
+        }
+        function applyAllAliveStudentsEvent(action) { getAliveStudents().forEach(action); }
+
+        function endGame() {
+            if (gameState.isGameOver && !document.getElementById('game-over-modal').classList.contains('hidden')) return;
+            gameState.isGameOver = true;
+            document.getElementById('continue-modal').classList.add('hidden');
+            document.getElementById('continue-modal').classList.remove('flex');
+
+            let totalS = 0, escapedCount = 0, sickCount = 0;
+            gameState.students.forEach(s => {
+                if(s.isDead) { if(s.deathReason === 'escaped') escapedCount++; if(s.deathReason === 'sick') sickCount++; } 
+                else { totalS += s.s; }
+            });
+            
+            let avg = Math.round(totalS / gameState.students.length);
+            
+            if (escapedCount + sickCount >= 3) {
+                document.getElementById('game-over-title').innerText = "遊戲失敗！";
+                document.getElementById('game-over-title').classList.replace('text-white', 'text-red-500');
+                document.getElementById('game-over-desc').innerText = `已有 3 名學生退場，在第 ${gameState.turn} 回合被迫終止`;
+            } else {
+                document.getElementById('game-over-title').innerText = "學期結束！";
+                document.getElementById('game-over-title').className = "text-5xl font-black text-white mb-3 drop-shadow-xl";
+                document.getElementById('game-over-desc').innerText = `${gameState.turn} 回合的無盡大作戰已劃下句點`;
+            }
+
+            document.getElementById('final-score').innerText = avg + " 分";
+            document.getElementById('final-alive').innerText = (gameState.students.length - escapedCount - sickCount) + " 人";
+            document.getElementById('final-escaped').innerText = escapedCount + " 人";
+            document.getElementById('final-sick').innerText = sickCount + " 人";
+            
+            if (!isTutorial && isFirebaseReady) {
+                document.getElementById('submit-score-section').classList.remove('hidden');
+            }
+
+            document.getElementById('game-over-modal').classList.remove('hidden');
+            document.getElementById('game-over-modal').classList.add('flex');
+        }
+
+        function openSelectionModalCore(items, maxSelect, forceExact, titleText, descText) {
+            return new Promise((resolve) => {
+                currentSelectionResolve = resolve; currentSelectedItems = [];
+                currentSelectionMax = maxSelect; currentSelectionCancelOverride = null; 
+                
+                document.getElementById('selection-title').innerText = titleText;
+                document.getElementById('selection-desc').innerText = descText;
+                
+                const grid = document.getElementById('selection-grid');
+                const confirmBtn = document.getElementById('selection-confirm-btn');
+                const skipBtn = document.getElementById('selection-skip-btn');
+                
+                grid.innerHTML = '';
+                
+                if(!forceExact) {
+                    skipBtn.classList.remove('hidden');
+                    skipBtn.onclick = () => { currentSelectionCancelOverride = null; closeSelectionModal(); resolve([]); };
+                } else skipBtn.classList.add('hidden');
+
+                items.forEach((item) => {
+                    let btn = document.createElement('div');
+                    btn.className = "bg-white rounded-xl shadow-[0_5px_15px_rgba(0,0,0,0.15)] border-4 border-slate-200 w-36 h-[288px] flex flex-col cursor-pointer transition-all hover:border-indigo-400 relative group overflow-hidden shrink-0";
+                    
+                    let iconHtml = item.icon && item.icon.startsWith('http') ? `<img src="${getSafeImageUrl(item.icon)}" referrerpolicy="no-referrer" class="w-full h-full object-cover pointer-events-none rounded-md">` : `<div class="text-6xl flex items-center justify-center w-full h-full">${item.icon}</div>`;
+
+                    btn.innerHTML = `
+                        <div class="absolute top-1 right-1 w-6 h-6 rounded-full border-2 border-slate-300 flex items-center justify-center opacity-0 checkmark transition-all bg-indigo-500 text-white font-bold text-sm shadow-md z-20">✓</div>
+                        <div class="font-black text-slate-800 border-b-2 border-slate-100 pb-1 text-center text-sm bg-slate-50 pt-2 group-hover:bg-indigo-50 transition-colors z-10 shrink-0 shadow-sm truncate px-1">${item.name}</div>
+                        <div class="h-32 flex items-center justify-center bg-slate-100 overflow-hidden shrink-0 relative border-b border-slate-200 -mx-1">${iconHtml}</div>
+                        <div class="text-[11px] text-slate-600 flex-1 break-words font-medium leading-tight mt-1 overflow-y-auto custom-scrollbar p-2 bg-white">${item.desc}</div>
+                    `;
+                    
+                    btn.onclick = () => {
+                        let selectedIdx = currentSelectedItems.findIndex(x => x.uid === item.uid);
+                        if(selectedIdx > -1) {
+                            currentSelectedItems.splice(selectedIdx, 1);
+                            btn.classList.remove('border-indigo-500', 'ring-4', 'ring-indigo-200');
+                            btn.querySelector('.checkmark').classList.add('opacity-0', 'scale-50');
+                        } else if(currentSelectedItems.length < maxSelect) {
+                            currentSelectedItems.push(item);
+                            btn.classList.add('border-indigo-500', 'ring-4', 'ring-indigo-200');
+                            btn.querySelector('.checkmark').classList.remove('opacity-0', 'scale-50');
+                        }
+                        confirmBtn.disabled = forceExact ? (currentSelectedItems.length !== maxSelect) : (currentSelectedItems.length === 0);
+                    };
+                    grid.appendChild(btn);
+                });
+                
+                confirmBtn.classList.remove('hidden'); confirmBtn.disabled = forceExact ? (maxSelect > 0) : true;
+                confirmBtn.onclick = () => { currentSelectionCancelOverride = null; closeSelectionModal(); resolve(currentSelectedItems); };
+                
+                document.getElementById('selection-modal').classList.remove('hidden');
+                document.getElementById('selection-modal').classList.add('flex');
+            });
+        }
+
+        function closeSelectionModal() {
+            document.getElementById('selection-modal').classList.add('hidden');
+            document.getElementById('selection-modal').classList.remove('flex');
+            if(currentSelectionResolve && currentSelectionCancelOverride !== null) currentSelectionResolve([]);
+        }
+        
+        function showGlossaryModal() { document.getElementById('glossary-modal').classList.remove('hidden'); document.getElementById('glossary-modal').classList.add('flex'); }
+        function closeGlossaryModal() { document.getElementById('glossary-modal').classList.add('hidden'); document.getElementById('glossary-modal').classList.remove('flex'); }
+
+        function useRecycleAbility() {
+            if(isTutorial) return;
+            if ((gameState.recycleMax || 0) <= (gameState.recycleUsed || 0)) return;
+            if(gameState.grave.length === 0) { showToast("垃圾場目前為空！", "error"); return; }
+            
+            openSelectionModalCore(gameState.grave, 1, false, "資源回收", "請選擇 1 張牌從垃圾場洗回牌庫\n(可直接跳過)").then(picked => {
+                if(picked.length > 0) {
+                    let idx = gameState.grave.findIndex(c => c.uid === picked[0].uid);
+                    if(idx > -1) {
+                        gameState.deck.push(gameState.grave.splice(idx, 1)[0]); shuffle(gameState.deck);
+                        gameState.recycleUsed = (gameState.recycleUsed || 0) + 1;
+                        showToast(`成功回收 ${picked[0].name}！`, "success"); updateTopBar(); renderActiveStudent(); 
+                    }
+                }
+            });
+        }
+
+        function showToast(msg, type="info") {
+            const toast = document.createElement('div');
+            let bg = type === "success" ? "bg-emerald-500" : (type === "error" ? "bg-red-500" : "bg-indigo-600");
+            toast.className = `${bg} text-white px-6 py-3 rounded-full shadow-2xl font-black text-lg transform transition-all duration-300 translate-y-[-20px] opacity-0 z-[650] border-2 border-white/20`;
+            toast.innerText = msg;
+            document.getElementById('toast-container').appendChild(toast);
+            setTimeout(() => toast.classList.remove('translate-y-[-20px]', 'opacity-0'), 10);
+            setTimeout(() => { toast.classList.add('opacity-0', 'scale-90'); setTimeout(() => toast.remove(), 300); }, type === "error" ? 3500 : 2500);
+        }
+
+        function shuffle(array) {
+            for (let i = array.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [array[i], array[j]] = [array[j], array[i]]; }
+        }
+    </script>
+</body>
+</html>
