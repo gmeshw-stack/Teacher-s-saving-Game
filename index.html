@@ -539,7 +539,6 @@
             if (!isFirebaseReady) return;
             document.getElementById('lb-loading').classList.remove('hidden');
             try {
-                // 修改為直接儲存到 leaderboard 集合中
                 const colRef = collection(db, 'leaderboard');
                 const snapshot = await getDocs(colRef);
                 lbAllScores = [];
@@ -599,11 +598,19 @@
 
             let filtered = lbAllScores.filter(s => s.grade === currentLbGrade);
             
+            // 這裡更新了更精準且徹底獨立的排序邏輯
             filtered.sort((a, b) => {
-                if (b[currentLbTab] !== a[currentLbTab]) {
-                    return b[currentLbTab] - a[currentLbTab]; // Descending
+                if (currentLbTab === 'score') {
+                    // 1. 在「最高平均分」視窗：優先比分數 -> 接著比回合 -> 最後比時間
+                    if (b.score !== a.score) return b.score - a.score;
+                    if (b.turns !== a.turns) return b.turns - a.turns;
+                    return a.timestamp - b.timestamp;
+                } else {
+                    // 2. 在「最高生存回合」視窗：優先比回合 -> 接著比分數 -> 最後比時間
+                    if (b.turns !== a.turns) return b.turns - a.turns;
+                    if (b.score !== a.score) return b.score - a.score;
+                    return a.timestamp - b.timestamp;
                 }
-                return a.timestamp - b.timestamp; // Earlier first if tie
             });
 
             let top10 = filtered.slice(0, 10);
@@ -646,7 +653,6 @@
 
             document.getElementById('lb-loading').classList.remove('hidden');
             try {
-                // 修改路徑
                 const colRef = collection(db, 'leaderboard');
                 const snapshot = await getDocs(colRef);
                 let count = 0;
@@ -689,7 +695,6 @@
             };
 
             try {
-                // 修改路徑
                 const colRef = collection(db, 'leaderboard');
                 await addDoc(colRef, data);
                 showToast("成績登錄成功！", "success");
